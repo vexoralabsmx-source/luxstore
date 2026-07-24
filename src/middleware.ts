@@ -17,16 +17,17 @@ export async function middleware(request: NextRequest) {
   const adminCookie = request.cookies.get('lux_admin_session');
   const userCookie = request.cookies.get('lux_user_session');
 
-  // Permitir el acceso a la zona de administración si existe la cookie o si se accede directamente
+  // Proteger estrictamente la zona de administración /admin
   if (pathname.startsWith('/admin')) {
-    if (adminCookie || process.env.NODE_ENV === 'development') {
-      return NextResponse.next();
+    if (!adminCookie || adminCookie.value !== 'true') {
+      return NextResponse.redirect(new URL('/login?redirect=/admin', request.url));
     }
   }
 
+  // Proteger el panel de cliente /dashboard
   if (pathname.startsWith('/dashboard')) {
-    if (userCookie || adminCookie || process.env.NODE_ENV === 'development') {
-      return NextResponse.next();
+    if ((!userCookie || userCookie.value !== 'true') && (!adminCookie || adminCookie.value !== 'true')) {
+      return NextResponse.redirect(new URL('/login?redirect=/dashboard', request.url));
     }
   }
 

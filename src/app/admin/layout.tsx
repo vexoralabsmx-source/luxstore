@@ -32,10 +32,27 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [checkingAuth, setCheckingAuth] = React.useState(true);
+
+  React.useEffect(() => {
+    const adminSession = localStorage.getItem('lux_admin_session');
+    const hasAdminCookie = document.cookie.includes('lux_admin_session=true');
+
+    if (!adminSession && !hasAdminCookie) {
+      window.location.href = '/login?redirect=/admin';
+    } else {
+      setIsAuthenticated(true);
+      setCheckingAuth(false);
+    }
+  }, []);
 
   const handleLogout = async () => {
     try {
+      document.cookie = "lux_admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+      document.cookie = "lux_user_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
       localStorage.removeItem('lux_admin_session');
+      localStorage.removeItem('lux_user_session');
       const supabase = createClient();
       await supabase.auth.signOut();
     } catch (e) {
@@ -43,6 +60,19 @@ export default function AdminLayout({
     }
     window.location.href = '/login';
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#C5A880] border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs text-zinc-400 font-mono">Verificando Credenciales Owner Admin...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return null;
 
   const navGroups = [
     {
