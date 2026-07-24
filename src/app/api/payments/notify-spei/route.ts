@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextResponse } from 'next/server';
 import { sendAdminSPEINotifyEmail } from '@/services/emailService';
 import { sendDiscordAlert } from '@/services/discordService';

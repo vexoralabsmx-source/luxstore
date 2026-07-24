@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextResponse } from 'next/server';
 import { deliverOrder } from '@/services/deliveryService';
 import { getClipPaymentStatus } from '@/lib/clip';
