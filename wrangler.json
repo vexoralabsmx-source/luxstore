@@ -5,8 +5,14 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "pages_build_output_dir": "./.next",
+  "pages_build_output_dir": ".next",
   "assets": {
-    "directory": "./.next"
+    "directory": ".next",
+    "exclude": [
+      "cache/**",
+      "cache",
+      "server/**",
+      "server"
+    ]
   }
 }
