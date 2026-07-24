@@ -26,7 +26,6 @@ import {
   LifeBuoy
 } from 'lucide-react';
 import { getOrderByNumber } from '@/services/orderService';
-import { deliverOrder } from '@/services/deliveryService';
 import { Order, PaymentMethod } from '@/types';
 import { LUX_BANK_INFO } from '@/data/luxCatalog';
 import { QuickSupportModal } from '@/components/QuickSupportModal';
@@ -127,7 +126,12 @@ export default function OrderStatusPage() {
     // Si el pedido está pagado pero no tiene entregas registradas aún, procesar entrega real de inventario
     if ((finalStatus === 'DELIVERED' || finalStatus === 'PAID') && localDeliveries.length === 0) {
       try {
-        const res = await deliverOrder(orderNumber);
+        const response = await fetch('/api/orders/deliver', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNumber }),
+        });
+        const res = await response.json();
         if (res && res.deliveredItems && res.deliveredItems.length > 0) {
           localDeliveries = res.deliveredItems.map((item: any, idx: number) => ({
             id: `del_${orderNumber}_${idx + 1}`,
