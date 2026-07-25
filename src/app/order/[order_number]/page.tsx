@@ -276,7 +276,7 @@ export default function OrderStatusPage() {
 
       {delivered && !canViewDelivery && (
         <div className="p-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-sm">
-          Inicia sesión con la cuenta que realizó la compra para revelar el contenido. También se envió al correo del pedido.
+          Inicia sesión con la cuenta que realizó la compra para revelar el contenido en tu bóveda digital. Si necesitas ayuda, abre un ticket de soporte.
         </div>
       )}
 
