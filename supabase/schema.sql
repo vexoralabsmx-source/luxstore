@@ -451,16 +451,27 @@ ALTER TABLE public.crypto_wallets ENABLE ROW LEVEL SECURITY;
 
 -- POLÍTICAS RLS BÁSICAS
 -- Productos y Categorías: Lectura pública si está activo
+DROP POLICY IF EXISTS "Categorias accesibles públicamente" ON public.categories;
 CREATE POLICY "Categorias accesibles públicamente" ON public.categories FOR SELECT USING (is_active = TRUE);
+DROP POLICY IF EXISTS "Productos accesibles públicamente" ON public.products;
 CREATE POLICY "Productos accesibles públicamente" ON public.products FOR SELECT USING (status = 'active');
+DROP POLICY IF EXISTS "Variantes accesibles públicamente" ON public.product_variants;
 CREATE POLICY "Variantes accesibles públicamente" ON public.product_variants FOR SELECT USING (is_active = TRUE);
+DROP POLICY IF EXISTS "Imágenes accesibles públicamente" ON public.product_images;
 CREATE POLICY "Imágenes accesibles públicamente" ON public.product_images FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Configuración visible públicamente" ON public.store_settings;
 CREATE POLICY "Configuración visible públicamente" ON public.store_settings FOR SELECT USING (TRUE);
 
 -- Perfiles y Billeteras: El propio usuario puede leer su información
+DROP POLICY IF EXISTS "Usuarios ven su propio perfil" ON public.profiles;
 CREATE POLICY "Usuarios ven su propio perfil" ON public.profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Usuarios ven sus propios roles" ON public.user_roles;
 CREATE POLICY "Usuarios ven sus propios roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Usuarios ven su propia billetera" ON public.wallets;
 CREATE POLICY "Usuarios ven su propia billetera" ON public.wallets FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Usuarios ven sus propias recargas" ON public.wallet_topups;
 CREATE POLICY "Usuarios ven sus propias recargas" ON public.wallet_topups FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Usuarios ven sus propios pedidos" ON public.orders;
 CREATE POLICY "Usuarios ven sus propios pedidos" ON public.orders FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Usuarios ven sus entregas digitales" ON public.deliveries;
 CREATE POLICY "Usuarios ven sus entregas digitales" ON public.deliveries FOR SELECT USING (auth.uid() = customer_id);
