@@ -17,6 +17,7 @@ import {
   Building2
 } from 'lucide-react';
 import { LUX_BANK_INFO, LUX_TERMS_AND_GUARANTEE } from '@/data/luxCatalog';
+import { ReviewsSection } from '@/components/ReviewsSection';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -36,8 +37,8 @@ export default function ProductDetailPage() {
         if (!found) return;
         found.image = found.image_url || '';
         found.delivery = found.estimated_delivery_time || 'Entrega inmediata';
-        found.rating = 5;
-        found.sales = 0;
+        found.rating = null;
+        found.review_count = 0;
         found.prices = (found.variants || [])
           .filter((variant: any) => variant.is_active)
           .map((variant: any) => ({
@@ -50,6 +51,22 @@ export default function ProductDetailPage() {
           label: 'Individual',
           price: Number(found.sale_price ?? found.base_price),
         });
+        fetch(`/api/reviews?productId=${encodeURIComponent(found.id)}&limit=1`, {
+          cache: 'no-store',
+        })
+          .then((response) => response.json())
+          .then((reviewsPayload) => {
+            setProduct((current: any) =>
+              current?.id === found.id
+                ? {
+                    ...current,
+                    rating: reviewsPayload.summary?.average || null,
+                    review_count: reviewsPayload.summary?.total || 0,
+                  }
+                : current
+            );
+          })
+          .catch(() => undefined);
       })
       .catch(console.error);
   }, [slug]);
@@ -167,9 +184,21 @@ export default function ProductDetailPage() {
           
           <div>
             <div className="flex items-center gap-2 text-xs text-[#C5A880] font-medium mb-2 font-mono">
-              <Star className="w-4 h-4 fill-[#C5A880]" />
-              <span>{product.rating} / 5.0</span>
-              <span className="text-zinc-500">• {product.sales} Compras confirmadas</span>
+              {product.review_count > 0 ? (
+                <>
+                  <Star className="w-4 h-4 fill-[#C5A880]" />
+                  <span>{Number(product.rating).toFixed(1)} / 5.0</span>
+                  <span className="text-zinc-500">
+                    · {product.review_count}{' '}
+                    {product.review_count === 1 ? 'reseña verificada' : 'reseñas verificadas'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Este producto aún no tiene reseñas</span>
+                </>
+              )}
             </div>
 
             <h1 className="font-serif text-3xl sm:text-4xl font-bold text-white">
@@ -319,6 +348,12 @@ export default function ProductDetailPage() {
           ))}
         </ul>
       </div>
+
+      <ReviewsSection
+        productId={product.id}
+        showAllLink={false}
+        title={`Opiniones sobre ${product.name}`}
+      />
 
     </div>
   );

@@ -54,6 +54,7 @@ export function Navbar() {
   const navLinks = [
     { name: 'Inicio', href: '/' },
     { name: 'Catálogo General', href: '/catalog' },
+    { name: 'Reseñas', href: '/reviews' },
     { name: 'Garantías', href: '/faq#garantia' },
     { name: 'FAQ', href: '/faq' },
     { name: 'Contacto', href: '/contact' },

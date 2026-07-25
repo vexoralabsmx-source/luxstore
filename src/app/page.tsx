@@ -10,6 +10,7 @@ import { PaymentAndSupportSection } from '@/components/PaymentAndSupportSection'
 import { LiveSalesToast } from '@/components/LiveSalesToast';
 import { QuickViewModal } from '@/components/QuickViewModal';
 import { InfiniteMarquee } from '@/components/InfiniteMarquee';
+import { ReviewsSection } from '@/components/ReviewsSection';
 
 export default function HomePage() {
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
@@ -56,6 +57,9 @@ export default function HomePage() {
 
       {/* 6. POR QUÉ LUX STORE (BENTO FEATURE GRID & SPEED CHART) */}
       <WhyUsBentoGrid />
+
+      {/* 7. RESEÑAS DE COMPRAS VERIFICADAS */}
+      <ReviewsSection />
 
       {/* 8. PAYMENTS, DASHBOARD, SUPPORT & INSTANT DELIVERY CARDS */}
       <PaymentAndSupportSection />

@@ -2,25 +2,35 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Copy, Eye, EyeOff, KeyRound, PackageX } from 'lucide-react';
+import { BadgeCheck, Copy, Eye, EyeOff, KeyRound, PackageX } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { PurchaseReviewForm } from '@/components/PurchaseReviewForm';
 
 export default function CustomerProductsPage() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [purchases, setPurchases] = useState<any[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase
-      .from('deliveries')
-      .select('id, delivered_content, created_at, item:order_items(product_name, variant_name), order:orders(order_number)')
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        setDeliveries(data || []);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase
+        .from('deliveries')
+        .select(
+          'id, delivered_content, created_at, item:order_items(id, product_id, product_name, variant_name), order:orders(order_number)'
+        )
+        .order('created_at', { ascending: false }),
+      fetch('/api/reviews?eligible=true', { cache: 'no-store' }).then(async (response) => ({
+        ok: response.ok,
+        payload: await response.json(),
+      })),
+    ]).then(([deliveriesResult, reviewsResult]) => {
+      if (deliveriesResult.error) console.error(deliveriesResult.error);
+      setDeliveries(deliveriesResult.data || []);
+      setPurchases(reviewsResult.ok ? reviewsResult.payload.purchases || [] : []);
+      setLoading(false);
+    });
   }, []);
 
   return (
@@ -42,7 +52,11 @@ export default function CustomerProductsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {deliveries.map((delivery) => (
+          {deliveries.map((delivery) => {
+            const purchase = purchases.find(
+              (item) => item.orderItemId === delivery.item?.id
+            );
+            return (
             <div key={delivery.id} className="bg-[#101010] border border-[#242424] rounded-3xl p-6 space-y-4">
               <div className="flex justify-between gap-4">
                 <div>
@@ -69,8 +83,27 @@ export default function CustomerProductsPage() {
                   </button>
                 </div>
               </div>
+              {purchase?.reviewed ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                  <BadgeCheck className="h-4 w-4" />
+                  Reseña verificada publicada
+                </div>
+              ) : purchase ? (
+                <PurchaseReviewForm
+                  purchase={purchase}
+                  onPublished={() =>
+                    setPurchases((current) =>
+                      current.map((item) =>
+                        item.orderItemId === purchase.orderItemId
+                          ? { ...item, reviewed: true }
+                          : item
+                      )
+                    )
+                  }
+                />
+              ) : null}
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>

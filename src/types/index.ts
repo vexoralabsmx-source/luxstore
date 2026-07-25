@@ -266,3 +266,15 @@ export interface WalletTransaction {
   order_id?: string;
   created_at: string;
 }
+
+export interface ProductReview {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_slug: string;
+  rating: number;
+  comment: string;
+  customer_name: string;
+  verified_purchase: true;
+  created_at: string;
+}
