@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 
 export default function ResetPasswordPage() {
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [checkingSession, setCheckingSession] = useState(true);
@@ -78,18 +80,49 @@ export default function ResetPasswordPage() {
 
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (error) {
-      setErrorMsg(error.message);
+    if (userError || !user?.email) {
+      setErrorMsg('La sesión de recuperación ya no es válida. Solicita otro enlace.');
       setLoading(false);
       return;
     }
 
-    setSuccessMsg('Tu contraseña fue actualizada. Ya puedes iniciar sesión.');
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      setErrorMsg(
+        error.code === 'same_password'
+          ? 'La contraseña nueva debe ser diferente de la anterior.'
+          : error.message
+      );
+      setLoading(false);
+      return;
+    }
+
+    await supabase.auth.signOut({ scope: 'local' });
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+
+    if (loginError) {
+      setErrorMsg(
+        'La contraseña se guardó, pero no pudo verificarse el acceso. Solicita otro enlace.'
+      );
+      setLoading(false);
+      return;
+    }
+
+    setSuccessMsg('Contraseña actualizada y acceso verificado. Entrando a tu cuenta…');
     setPassword('');
     setConfirmPassword('');
     setLoading(false);
+    router.replace('/dashboard');
+    router.refresh();
   };
 
   return (
@@ -121,11 +154,11 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        {checkingSession ? (
+        {successMsg ? null : checkingSession ? (
           <p className="text-center text-xs text-zinc-400">
             Verificando el enlace…
           </p>
-        ) : hasRecoverySession && !successMsg ? (
+        ) : hasRecoverySession ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs text-zinc-400 mb-1 font-mono uppercase">
@@ -137,6 +170,7 @@ export default function ResetPasswordPage() {
                   type="password"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="w-full bg-[#050505] border border-[#242424] rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[#C5A880]"
@@ -154,6 +188,7 @@ export default function ResetPasswordPage() {
                   type="password"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   className="w-full bg-[#050505] border border-[#242424] rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[#C5A880]"
