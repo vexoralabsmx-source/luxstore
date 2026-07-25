@@ -6,6 +6,28 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Mail, Lock, User, ArrowRight, AlertCircle, Crown } from 'lucide-react';
 
+function getRegistrationErrorMessage(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof error.message === 'string'
+        ? error.message
+        : '';
+
+  if (!message || message === '{}') {
+    return 'No se pudo crear la cuenta. Verifica la configuración de acceso o intenta más tarde.';
+  }
+
+  if (message.toLowerCase().includes('already registered')) {
+    return 'Este correo ya está registrado. Intenta recuperar tu contraseña.';
+  }
+
+  return message;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -34,7 +56,7 @@ export default function RegisterPage() {
       });
 
       if (error) {
-        setErrorMsg(error.message);
+        setErrorMsg(getRegistrationErrorMessage(error));
         setLoading(false);
         return;
       }
@@ -44,8 +66,8 @@ export default function RegisterPage() {
       } else {
         router.push('/login');
       }
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'No se pudo crear la cuenta');
+    } catch (err: unknown) {
+      setErrorMsg(getRegistrationErrorMessage(err));
       setLoading(false);
     }
   };
