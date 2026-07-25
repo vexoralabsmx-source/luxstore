@@ -48,7 +48,8 @@ export type WalletTxType =
   | 'BONUS'
   | 'ADJUSTMENT'
   | 'HOLD'
-  | 'RELEASE';
+  | 'RELEASE'
+  | 'TOPUP';
 
 export interface Profile {
   id: string;

@@ -29,11 +29,6 @@ export function PurchaseReviewForm({
       setError('Selecciona una calificación.');
       return;
     }
-    if (comment.trim().length < 12) {
-      setError('Cuéntanos un poco más: escribe al menos 12 caracteres.');
-      return;
-    }
-
     setLoading(true);
     const response = await fetch('/api/reviews', {
       method: 'POST',
@@ -82,6 +77,10 @@ export function PurchaseReviewForm({
           {purchase.productName}
           {purchase.variantName ? ` · ${purchase.variantName}` : ''}
         </p>
+        <p className="mt-2 text-xs leading-5 text-zinc-400">
+          Tu nombre, correo y número de pedido siempre permanecen privados.
+          La reseña se publica como Anónimo.
+        </p>
       </div>
 
       <fieldset>
@@ -115,17 +114,15 @@ export function PurchaseReviewForm({
           htmlFor={`review-${purchase.orderItemId}`}
           className="mb-2 block text-xs font-semibold text-zinc-300"
         >
-          ¿Cómo fue tu experiencia?
+          ¿Cómo fue tu experiencia? <span className="text-zinc-500">(opcional)</span>
         </label>
         <textarea
           id={`review-${purchase.orderItemId}`}
-          required
-          minLength={12}
           maxLength={800}
           rows={4}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
-          placeholder="Entrega, producto, atención… escribe una opinión honesta."
+          placeholder="Puedes publicar solo las estrellas o añadir un comentario."
           className="w-full resize-y rounded-xl border border-white/[0.1] bg-black px-4 py-3 text-base leading-6 text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-[#C5A880] focus:ring-1 focus:ring-[#C5A880]"
         />
         <p className="mt-1 text-right text-[11px] text-zinc-500">

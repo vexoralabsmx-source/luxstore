@@ -45,6 +45,8 @@ La configuración en `next.config.ts` aplica los siguientes encabezados en cada 
 ### 2.5 Verificación de Webhooks y Cero Confianza
 - El webhook de Clip (`/api/webhooks/clip`) no confía en las redirecciones del navegador del cliente.
 - Antes de procesar cualquier entrega, el servidor realiza una llamada directa de validación a la API oficial de Clip (`getClipPaymentStatus`) para verificar el estado real del cobro.
+- Las recargas de créditos usan un webhook independiente (`/api/webhooks/clip/wallet`) y una función SQL atómica e idempotente. Un mismo `payment_request_id` nunca puede acreditar saldo dos veces.
+- Aplica las migraciones de Supabase en orden; las migraciones del enum `TOPUP` y de recargas Clip están separadas deliberadamente.
 - La ejecución de entrega es atómica e idempotente: si la transacción ya fue entregada, el sistema responde de forma segura sin duplicar el stock.
 
 ---

@@ -18,7 +18,8 @@ export interface ProductCard3DProps {
     image: string;
     logo?: string;
     brandColor?: string;
-    rating: number;
+    rating: number | null;
+    review_count?: number;
     sales: number;
   };
   onQuickView?: (product: any) => void;
@@ -97,10 +98,24 @@ export function ProductCard3D({ product, onQuickView, onAddToCart }: ProductCard
 
         {/* Card Body */}
         <div className="p-5 space-y-2.5">
-          <div className="flex items-center gap-1 text-[#C5A880] text-xs font-medium">
-            <Star className="w-3.5 h-3.5 fill-[#C5A880]" />
-            <span>{product.rating}</span>
-            <span className="text-zinc-500 ml-1 font-mono">({product.sales} ventas)</span>
+          <div className="flex min-h-5 flex-wrap items-center gap-2 text-xs">
+            {product.review_count && product.rating !== null ? (
+              <span className="inline-flex items-center gap-1 font-medium text-[#C5A880]">
+                <Star className="h-3.5 w-3.5 fill-[#C5A880]" />
+                {product.rating.toFixed(1)}
+                <span className="text-zinc-500">
+                  ({product.review_count}{' '}
+                  {product.review_count === 1 ? 'reseña' : 'reseñas'})
+                </span>
+              </span>
+            ) : (
+              <span className="text-zinc-500">Sin reseñas aún</span>
+            )}
+            {product.sales > 0 && (
+              <span className="font-mono text-zinc-500">
+                · {product.sales} {product.sales === 1 ? 'venta' : 'ventas'}
+              </span>
+            )}
           </div>
 
           <Link href={`/product/${product.slug}`} className="block">

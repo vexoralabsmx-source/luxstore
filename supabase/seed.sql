@@ -1,11 +1,7 @@
--- =========================================================
--- LUX STORE — DATOS INICIALES NO SENSIBLES
--- =========================================================
+-- Crea las cuentas administrativas mediante Supabase Auth.
+-- Nunca guardes correos privados ni contraseñas en este archivo.
 
--- Las cuentas administrativas deben crearse mediante Supabase Auth.
--- Nunca guardes correos privados ni contraseñas dentro de este archivo.
-
--- 1. Configuración Global de la Tienda
+-- 2. Configuración Global de la Tienda
 INSERT INTO public.store_settings (id, store_name, currency, support_email)
 VALUES (
   1,
@@ -17,7 +13,7 @@ VALUES (
   currency = EXCLUDED.currency,
   support_email = EXCLUDED.support_email;
 
--- 2. Categorías Base
+-- 3. Categorías Base
 INSERT INTO public.categories (name, slug, description, is_active)
 VALUES
   ('Diseño y Productividad', 'diseno-productividad', 'Canva Pro, CapCut Pro, Scribd, Microsoft 365', true),

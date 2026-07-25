@@ -8,18 +8,11 @@ export const runtime = 'edge';
 const reviewSchema = z.object({
   orderItemId: z.string().uuid(),
   rating: z.number().int().min(1).max(5),
-  comment: z.string().trim().min(12).max(800),
+  comment: z.string().trim().max(800).default(''),
 });
 
 function relation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] || null : value || null;
-}
-
-function publicCustomerName(fullName?: string | null) {
-  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'Cliente verificado';
-  if (parts.length === 1) return parts[0];
-  return `${parts[0]} ${parts[1][0].toUpperCase()}.`;
 }
 
 async function getEligiblePurchases() {
@@ -90,7 +83,7 @@ export async function GET(request: NextRequest) {
   let reviewsQuery = admin
     .from('product_reviews')
     .select(
-      'id, product_id, rating, comment, created_at, product:products(name, slug), profile:profiles(full_name)',
+      'id, product_id, rating, comment, created_at, product:products(name, slug)',
       { count: 'exact' }
     )
     .eq('is_published', true)
@@ -135,7 +128,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     reviews: (reviews || []).map((review) => {
       const product = relation(review.product);
-      const profile = relation(review.profile);
       return {
         id: review.id,
         product_id: review.product_id,
@@ -143,7 +135,7 @@ export async function GET(request: NextRequest) {
         product_slug: product?.slug || '',
         rating: Number(review.rating),
         comment: review.comment,
-        customer_name: publicCustomerName(profile?.full_name),
+        customer_name: 'Anónimo',
         verified_purchase: true,
         created_at: review.created_at,
       };
@@ -169,7 +161,7 @@ export async function POST(request: NextRequest) {
   const parsed = reviewSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Selecciona de 1 a 5 estrellas y escribe al menos 12 caracteres' },
+      { error: 'Selecciona una calificación de 1 a 5 estrellas' },
       { status: 400 }
     );
   }

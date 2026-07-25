@@ -2,30 +2,54 @@
 
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
-import { LIVE_NOTIFICATIONS } from '@/data/luxPacks';
+
+type RecentSale = {
+  product: string;
+  quantity: number;
+  image: string;
+  deliveredAt: string;
+};
 
 export function LiveSalesToast() {
+  const [sales, setSales] = useState<RecentSale[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visible, setVisible] = useState(true);
   const [closed, setClosed] = useState(false);
 
   useEffect(() => {
-    if (closed) return;
+    fetch('/api/sales/recent', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => setSales(payload.sales || []))
+      .catch(() => setSales([]));
+  }, []);
+
+  useEffect(() => {
+    if (closed || sales.length < 2) return;
 
     const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % LIVE_NOTIFICATIONS.length);
+        setCurrentIndex((prev) => (prev + 1) % sales.length);
         setVisible(true);
       }, 500);
     }, 6500);
 
     return () => clearInterval(interval);
-  }, [closed]);
+  }, [closed, sales.length]);
 
-  if (closed) return null;
+  if (closed || sales.length === 0) return null;
 
-  const currentNotif = LIVE_NOTIFICATIONS[currentIndex];
+  const currentSale = sales[currentIndex];
+  const elapsedMinutes = Math.max(
+    1,
+    Math.floor((Date.now() - new Date(currentSale.deliveredAt).getTime()) / 60000)
+  );
+  const elapsed =
+    elapsedMinutes < 60
+      ? `hace ${elapsedMinutes} min`
+      : elapsedMinutes < 1440
+        ? `hace ${Math.floor(elapsedMinutes / 60)} h`
+        : `hace ${Math.floor(elapsedMinutes / 1440)} d`;
 
   return (
     <div
@@ -40,8 +64,8 @@ export function LiveSalesToast() {
         {/* Thumbnail Icon */}
         <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-700/60 flex-shrink-0 flex items-center justify-center">
           <img
-            src={currentNotif.image}
-            alt={currentNotif.product}
+            src={currentSale.image}
+            alt=""
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
           />
         </div>
@@ -49,17 +73,18 @@ export function LiveSalesToast() {
         {/* Info */}
         <div className="flex-1 min-w-0 pr-4">
           <p className="text-[11px] text-zinc-400 font-medium truncate">
-            {currentNotif.user} purchased
+            Compra anónima entregada
           </p>
           <h4 className="text-xs font-bold text-white truncate font-sans tracking-wide">
-            {currentNotif.product}
+            {currentSale.quantity > 1 ? `${currentSale.quantity}× ` : ''}
+            {currentSale.product}
           </h4>
           <div className="flex items-center gap-2 mt-1">
             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-semibold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/40">
               <CheckCircle className="w-3 h-3 text-emerald-400" />
-              Verified
+              Verificada
             </span>
-            <span className="text-[10px] text-zinc-500 font-mono">• {currentNotif.timeAgo}</span>
+            <span className="text-[10px] text-zinc-500 font-mono">· {elapsed}</span>
           </div>
         </div>
 

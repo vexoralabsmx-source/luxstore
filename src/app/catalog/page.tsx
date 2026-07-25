@@ -197,8 +197,9 @@ export default function CatalogPage() {
                 image: product.image_url || product.image || '',
                 logo: product.logo || '',
                 brandColor: product.brandColor || '#C5A880',
-                rating: product.rating || 4.9,
-                sales: product.sales || 120,
+                rating: product.rating,
+                review_count: product.review_count || 0,
+                sales: product.sales || 0,
               }}
               onAddToCart={handleAddToCart}
             />

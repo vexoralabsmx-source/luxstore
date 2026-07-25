@@ -134,7 +134,7 @@ export function ResellerApiSection() {
               {/* Response Header */}
               <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/60">
                 <span className="text-emerald-400 font-bold">200 OK</span>
-                <span className="text-zinc-500">• 0.8s</span>
+                <span className="text-zinc-500">• respuesta confirmada</span>
               </div>
 
               {/* JSON Response */}

@@ -48,7 +48,7 @@ export function FeaturedCarousel3D({ onQuickView, onAddToCart }: FeaturedCarouse
               Los mejores productos digitales, listos al instante
             </h2>
             <p className="text-sm text-zinc-400 font-sans max-w-xl">
-              Los más vendidos en un carrusel interactivo — desliza, pulsa una tarjeta lateral o usa las flechas para explorar.
+              Productos destacados en un carrusel interactivo — desliza, pulsa una tarjeta lateral o usa las flechas para explorar.
             </p>
           </div>
 
@@ -115,10 +115,12 @@ export function FeaturedCarousel3D({ onQuickView, onAddToCart }: FeaturedCarouse
                         En stock
                       </span>
 
-                      <span className="inline-flex items-center gap-1 bg-black/70 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                        <Star className="w-3 h-3 fill-amber-400" />
-                        {product.rating || 4.9}
-                      </span>
+                      {product.rating > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-black/70 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                          <Star className="w-3 h-3 fill-amber-400" />
+                          {product.rating}
+                        </span>
+                      )}
                     </div>
 
                     {/* Quick View Button overlay on center card */}
@@ -228,4 +230,3 @@ export function FeaturedCarousel3D({ onQuickView, onAddToCart }: FeaturedCarouse
     </section>
   );
 }
-

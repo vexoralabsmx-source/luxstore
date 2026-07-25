@@ -111,7 +111,8 @@ export function ReviewsSection({
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-400">
               Opiniones publicadas por clientes después de recibir su producto.
-              Sin reseñas anónimas ni valoraciones importadas.
+              Todas son anónimas para proteger su identidad y ninguna valoración
+              es importada o inventada.
             </p>
           </div>
 
@@ -181,9 +182,15 @@ export function ReviewsSection({
 
                 <div className="mt-5">
                   <Stars rating={review.rating} />
-                  <p className="mt-3 text-sm leading-6 text-zinc-300">
-                    “{review.comment}”
-                  </p>
+                  {review.comment ? (
+                    <p className="mt-3 text-sm leading-6 text-zinc-300">
+                      “{review.comment}”
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-zinc-500">
+                      Calificación sin comentario.
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-auto flex items-end justify-between gap-3 border-t border-white/[0.06] pt-4">

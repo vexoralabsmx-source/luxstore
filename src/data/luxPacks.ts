@@ -72,38 +72,3 @@ export const LUX_PACKS: LuxPack[] = [
     includedServices: ['NBA Pass', 'UFC Pass', 'DAZN', 'NFL Pass'],
   },
 ];
-
-export const LIVE_NOTIFICATIONS = [
-  {
-    id: 'notif-1',
-    user: 'Alguien en Ciudad de México',
-    product: 'Nord VPN [Privada] (LIFETIME)',
-    timeAgo: 'hace 47 minutos',
-    verified: true,
-    image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=120&q=80',
-  },
-  {
-    id: 'notif-2',
-    user: 'Alguien en Monterrey',
-    product: 'Disney+ [LIFETIME] Ultra HD',
-    timeAgo: 'hace 12 minutos',
-    verified: true,
-    image: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=120&q=80',
-  },
-  {
-    id: 'notif-3',
-    user: 'Alguien en Guadalajara',
-    product: 'Canva Pro [Acceso Anual]',
-    timeAgo: 'hace 5 minutos',
-    verified: true,
-    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=120&q=80',
-  },
-  {
-    id: 'notif-4',
-    user: 'Alguien en Puebla',
-    product: 'Pack General (14 Cuentas Premium)',
-    timeAgo: 'Ahora mismo',
-    verified: true,
-    image: 'https://images.unsplash.com/photo-1614680376593-902f749f7cfc?auto=format&fit=crop&w=120&q=80',
-  },
-];

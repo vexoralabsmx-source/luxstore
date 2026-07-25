@@ -77,15 +77,15 @@ export function HeroEnvelopeGrid() {
 
             {/* Social Proof metrics */}
             <div className="flex flex-wrap items-center gap-6 pt-4 border-t border-zinc-800/80 text-xs text-zinc-400 font-sans">
-              <div className="flex items-center gap-1.5">
-                <Star className="w-4 h-4 text-[#C5A880] fill-[#C5A880]" />
-                <span className="font-semibold text-zinc-200">4,9/5</span>
-                <span>de 29.596 reseñas</span>
-              </div>
+              <Link href="/reviews" className="flex items-center gap-1.5 hover:text-white">
+                <Star className="w-4 h-4 text-[#C5A880]" />
+                <span className="font-semibold text-zinc-200">Reseñas reales</span>
+                <span>anónimas y verificadas</span>
+              </Link>
 
               <div className="flex items-center gap-1.5">
                 <Zap className="w-4 h-4 text-[#C5A880]" />
-                <span>Entrega media 0,8s</span>
+                <span>Entrega tras confirmar el pago</span>
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -164,4 +164,3 @@ export function HeroEnvelopeGrid() {
     </div>
   );
 }
-
