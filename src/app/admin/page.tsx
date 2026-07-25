@@ -12,7 +12,6 @@ import {
   ArrowUpRight,
   RefreshCw
 } from 'lucide-react';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -31,21 +30,18 @@ export default function AdminDashboardPage() {
   const fetchRealStats = async () => {
     setLoading(true);
     try {
-      const supabase = createAdminClient();
-      
-      // Consultar pedidos reales de Supabase DB
-      const { data: dbOrders } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/admin/orders', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      const dbOrders: any[] = payload.orders || [];
 
       if (dbOrders && dbOrders.length > 0) {
         setRecentOrders(dbOrders.slice(0, 5));
 
-        const paid = dbOrders.filter((o) => o.status === 'DELIVERED' || o.status === 'PAID');
-        const pending = dbOrders.filter((o) => o.status === 'PAYMENT_REVIEW' || o.status === 'PENDING_PAYMENT');
+        const paid = dbOrders.filter((o: any) => o.status === 'DELIVERED' || o.status === 'PAID');
+        const pending = dbOrders.filter((o: any) => o.status === 'PAYMENT_REVIEW' || o.status === 'PENDING_PAYMENT');
 
-        const income = paid.reduce((acc, curr) => acc + (curr.total || 0), 0);
+        const income = paid.reduce((acc: number, curr: any) => acc + Number(curr.total || 0), 0);
 
         setStats({
           monthlyIncome: income,

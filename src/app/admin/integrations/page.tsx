@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Zap, Send, CheckCircle2, AlertCircle } from 'lucide-react';
-import { sendDiscordAlert } from '@/services/discordService';
 
 export default function AdminIntegrationsPage() {
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
@@ -13,14 +12,12 @@ export default function AdminIntegrationsPage() {
     setLoadingPing(true);
     setPingResult(null);
 
-    const res = await sendDiscordAlert(
-      {
-        title: '🧪 Prueba de Integración Discord — Lux Store',
-        description: 'Webhook verificado correctamente desde el Panel Administrativo de Lux Store.',
-        color: 0xC5A880,
-      },
-      discordWebhookUrl.trim() || undefined
-    );
+    const response = await fetch('/api/admin/integrations/discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhookUrl: discordWebhookUrl.trim() || undefined }),
+    });
+    const res = await response.json();
 
     if (res.success) {
       setPingResult({

@@ -1,59 +1,66 @@
-export const runtime = 'edge';
-
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sendAdminSPEINotifyEmail } from '@/services/emailService';
 import { sendDiscordAlert } from '@/services/discordService';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+const schema = z.object({
+  orderNumber: z.string().min(8).max(40),
+  paymentReference: z.string().trim().min(4).max(120),
+});
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { orderNumber, customerEmail, totalAmount, paymentReference } = body;
-
-    if (!orderNumber || !paymentReference) {
-      return NextResponse.json({ error: 'Faltan parámetros requeridos' }, { status: 400 });
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Referencia inválida' }, { status: 400 });
     }
 
-    const email = customerEmail || 'cliente@ejemplo.com';
-    const amount = parseFloat(totalAmount) || 0;
+    const supabase = createAdminClient();
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select('id, order_number, customer_email, total, status, payment_method')
+      .eq('order_number', parsed.data.orderNumber)
+      .maybeSingle();
 
-    // 1. Actualizar orden en la base de datos Supabase
-    try {
-      const supabase = createAdminClient();
-      await supabase
-        .from('orders')
-        .update({
-          status: 'PAYMENT_REVIEW',
-          payment_reference: paymentReference,
-        })
-        .eq('order_number', orderNumber);
-    } catch (dbErr) {
-      console.warn('Advertencia actualizando orden en Supabase:', dbErr);
+    if (error || !order || order.payment_method !== 'spei') {
+      return NextResponse.json({ error: 'Pedido SPEI no encontrado' }, { status: 404 });
+    }
+    if (order.status !== 'PENDING_PAYMENT') {
+      return NextResponse.json({ error: 'El pedido ya fue reportado o procesado' }, { status: 409 });
     }
 
-    // 2. Enviar correo de notificación de alta prioridad al Administrador mikeangdhz@gmail.com
-    await sendAdminSPEINotifyEmail({
-      orderNumber,
-      customerEmail: email,
-      totalAmount: amount,
-      paymentReference,
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        status: 'PAYMENT_REVIEW',
+        payment_reference: parsed.data.paymentReference,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id)
+      .eq('status', 'PENDING_PAYMENT');
+    if (updateError) throw updateError;
+
+    const emailSent = await sendAdminSPEINotifyEmail({
+      orderNumber: order.order_number,
+      customerEmail: order.customer_email,
+      totalAmount: Number(order.total),
+      paymentReference: parsed.data.paymentReference,
     });
 
-    // 3. Enviar alerta inmediata al servidor de Discord
     await sendDiscordAlert({
-      title: '🔔 ALERTA SPEI: Nuevo Comprobante Recibido',
-      description: `El cliente **${email}** reportó un pago de **$${amount.toFixed(2)} MXN** para la orden **${orderNumber}**.`,
+      title: 'Nuevo comprobante SPEI',
+      description: `Pedido ${order.order_number} en revisión.`,
       fields: [
-        { name: 'Folio / Referencia SPEI', value: `\`${paymentReference}\``, inline: true },
-        { name: 'Monto', value: `$${amount.toFixed(2)} MXN`, inline: true },
-        { name: 'Estado', value: 'En Revisión (SPEI)', inline: true },
+        { name: 'Referencia', value: parsed.data.paymentReference, inline: true },
+        { name: 'Monto', value: `$${Number(order.total).toFixed(2)} MXN`, inline: true },
       ],
-      color: 0xF59E0B, // Ambar
-    });
+      color: 0xf59e0b,
+    }).catch(() => undefined);
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error al notificar pago SPEI a admin:', error);
-    return NextResponse.json({ error: 'Error interno al enviar notificación' }, { status: 500 });
+    return NextResponse.json({ success: true, emailSent });
+  } catch (error) {
+    console.error('Error notificando SPEI:', error);
+    return NextResponse.json({ error: 'No se pudo registrar la transferencia' }, { status: 500 });
   }
 }

@@ -16,7 +16,7 @@ import {
   AlertCircle,
   Building2
 } from 'lucide-react';
-import { LUX_PRODUCTS, LUX_BANK_INFO, LUX_TERMS_AND_GUARANTEE } from '@/data/luxCatalog';
+import { LUX_BANK_INFO, LUX_TERMS_AND_GUARANTEE } from '@/data/luxCatalog';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -29,44 +29,34 @@ export default function ProductDetailPage() {
   const [isAdded, setIsAdded] = useState(false);
 
   React.useEffect(() => {
-    try {
-      const stored = localStorage.getItem('lux_admin_products');
-      let found: any = null;
-      if (stored) {
-        const adminProducts: any[] = JSON.parse(stored);
-        found = adminProducts.find((p) => p.slug === slug || p.id === slug);
-      }
-
-      if (!found) {
-        found = LUX_PRODUCTS.find((p) => p.slug === slug) || {
-          id: `prod_${slug}`,
-          name: slug ? slug.replace(/-/g, ' ').toUpperCase() : 'Producto Digital',
-          slug: slug || 'producto-digital',
-          category_name: 'Digital',
-          base_price: 299,
-          sale_price: 199,
-          prices: [{ label: '1 mes', price: 199 }],
-          delivery: 'Entrega Instantánea',
-          image: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&auto=format&fit=crop&q=80',
-          logo: '',
-          brandColor: '#C5A880',
-          rating: 5.0,
-          sales: 150,
-        };
-      }
-
-      setProduct(found);
-      if (found.prices && found.prices.length > 0) {
-        setSelectedPrice(found.prices[0]);
-      } else {
-        setSelectedPrice({ label: 'Individual', price: found.sale_price || found.base_price || 199 });
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    fetch('/api/catalog', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => {
+        const found = payload.products?.find((item: any) => item.slug === slug);
+        if (!found) return;
+        found.image = found.image_url || '';
+        found.delivery = found.estimated_delivery_time || 'Entrega inmediata';
+        found.rating = 5;
+        found.sales = 0;
+        found.prices = (found.variants || [])
+          .filter((variant: any) => variant.is_active)
+          .map((variant: any) => ({
+            id: variant.id,
+            label: variant.name,
+            price: Number(variant.sale_price ?? variant.price),
+          }));
+        setProduct(found);
+        setSelectedPrice(found.prices[0] || {
+          label: 'Individual',
+          price: Number(found.sale_price ?? found.base_price),
+        });
+      })
+      .catch(console.error);
   }, [slug]);
 
-  if (!product) return null;
+  if (!product) {
+    return <div className="max-w-4xl mx-auto px-4 py-20 text-center text-zinc-400">Producto no encontrado.</div>;
+  }
 
   const handleAddToCart = () => {
     try {
@@ -80,10 +70,12 @@ export default function ProductDetailPage() {
         base_price: product.base_price,
         sale_price: selectedPrice.price,
         variant_name: selectedPrice.label,
+        variant_id: selectedPrice.id,
         image: product.image,
         logo: product.logo,
         brandColor: product.brandColor,
         quantity: selectedQty,
+        stock: product.stock,
       };
       
       const index = cart.findIndex((item: any) => item.id === itemToSave.id);
@@ -251,9 +243,27 @@ export default function ProductDetailPage() {
               <div className="flex items-center justify-between p-3 bg-[#050505] border border-[#1C1C1C] rounded-2xl font-mono text-xs">
                 <span className="text-zinc-400 font-bold uppercase">Límite de Compra:</span>
                 <span className="text-[#C5A880] font-bold px-3 py-1 bg-[#141414] border border-[#1C1C1C] rounded-xl">
-                  🔒 1 unidad por pedido
+                  Hasta {product.stock} unidad(es)
                 </span>
               </div>
+            )}
+
+            {product.stock > 1 && (
+              <label className="block text-xs text-zinc-400">
+                Cantidad
+                <input
+                  type="number"
+                  min={1}
+                  max={product.stock}
+                  value={selectedQty}
+                  onChange={(event) =>
+                    setSelectedQty(
+                      Math.max(1, Math.min(product.stock, Number(event.target.value) || 1))
+                    )
+                  }
+                  className="ml-3 w-20 bg-[#050505] border border-[#1C1C1C] rounded-lg px-3 py-2 text-white"
+                />
+              </label>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

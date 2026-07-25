@@ -36,23 +36,28 @@ export default function AdminLayout({
   const [checkingAuth, setCheckingAuth] = React.useState(true);
 
   React.useEffect(() => {
-    const adminSession = localStorage.getItem('lux_admin_session');
-    const hasAdminCookie = document.cookie.includes('lux_admin_session=true');
-
-    if (!adminSession && !hasAdminCookie) {
-      window.location.href = '/login?redirect=/admin';
-    } else {
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        window.location.href = '/login?redirect=/admin';
+        return;
+      }
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      const allowed = roles?.some(({ role }) => role === 'owner' || role === 'admin');
+      if (!allowed) {
+        window.location.href = '/dashboard';
+        return;
+      }
       setIsAuthenticated(true);
       setCheckingAuth(false);
-    }
+    });
   }, []);
 
   const handleLogout = async () => {
     try {
-      document.cookie = "lux_admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-      document.cookie = "lux_user_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-      localStorage.removeItem('lux_admin_session');
-      localStorage.removeItem('lux_user_session');
       const supabase = createClient();
       await supabase.auth.signOut();
     } catch (e) {

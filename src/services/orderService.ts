@@ -1,186 +1,218 @@
+import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { Order, OrderStatus, PaymentMethod } from '@/types';
 import { sendPaymentPendingEmail } from '@/services/emailService';
 import { deliverOrder } from '@/services/deliveryService';
+import type { Order, PaymentMethod } from '@/types';
 
-/**
- * Genera un número de pedido único con prefijo LX-2026-xxxxxx
- */
 export function generateOrderNumber(): string {
   const year = new Date().getFullYear();
-  const randomDigits = Math.floor(100000 + Math.random() * 900000);
-  return `LX-${year}-${randomDigits}`;
+  const random = crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
+  return `LX-${year}-${random}`;
 }
 
-/**
- * Genera un monto con centavos únicos para transferencias SPEI (ej. $150.17 MXN)
- */
-export function calculateUniqueCentsAmount(baseAmount: number): number {
-  const randomCents = Math.floor(1 + Math.random() * 99) / 100;
-  return Math.floor(baseAmount) + randomCents;
-}
+type RequestedItem = {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+};
 
 export interface CreateOrderParams {
   userId?: string;
   customerEmail: string;
   paymentMethod: PaymentMethod;
-  items: {
-    productId: string;
-    variantId?: string;
-    productName: string;
-    variantName?: string;
-    unitPrice: number;
-    quantity: number;
-  }[];
-  subtotal: number;
-  discountAmount: number;
-  total: number;
+  items: RequestedItem[];
   customerNotes?: string;
-  prePurchaseAnswers?: Record<string, string>;
+  couponCode?: string;
   ipAddress?: string;
   userAgent?: string;
 }
 
-/**
- * Crea una orden y activa el envío de correos por Resend según el método de pago
- */
-export async function createOrder(params: CreateOrderParams): Promise<{ success: boolean; order?: Order; orderNumber?: string; message?: string }> {
-  const orderNumber = generateOrderNumber();
-  let finalTotal = params.total;
-  let uniqueCentsAmount: number | undefined = undefined;
+export async function createOrder(params: CreateOrderParams): Promise<{
+  order: Order;
+  emailSent?: boolean;
+  deliveryMessage?: string;
+}> {
+  const supabase = createAdminClient();
+  const normalizedItems = params.items.map((item) => ({
+    ...item,
+    quantity: Math.max(1, Math.min(20, Math.floor(Number(item.quantity)))),
+  }));
 
-  // Si es transferencia SPEI, generar centavos únicos
-  if (params.paymentMethod === 'spei') {
-    uniqueCentsAmount = calculateUniqueCentsAmount(params.total);
-    finalTotal = uniqueCentsAmount;
+  const productIds = [...new Set(normalizedItems.map((item) => item.productId))];
+  const variantIds = [
+    ...new Set(normalizedItems.map((item) => item.variantId).filter(Boolean) as string[]),
+  ];
+
+  const [{ data: products, error: productsError }, { data: variants, error: variantsError }] =
+    await Promise.all([
+      supabase
+        .from('products')
+        .select('id, name, base_price, sale_price, status')
+        .in('id', productIds)
+        .eq('status', 'active'),
+      variantIds.length
+        ? supabase
+            .from('product_variants')
+            .select('id, product_id, name, price, sale_price, is_active')
+            .in('id', variantIds)
+            .eq('is_active', true)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+  if (productsError || variantsError) throw new Error('No se pudo validar el catálogo');
+  if (!products || products.length !== productIds.length) {
+    throw new Error('Uno o más productos ya no están disponibles');
   }
 
-  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-  const initialStatus: OrderStatus = params.paymentMethod === 'credits' ? 'PAID' : 'PENDING_PAYMENT';
+  const productMap = new Map(products.map((product) => [product.id, product]));
+  const variantMap = new Map((variants || []).map((variant) => [variant.id, variant]));
 
-  let createdOrderRecord: any = null;
-
-  try {
-    const supabase = createAdminClient();
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        user_id: params.userId || null,
-        customer_email: params.customerEmail,
-        payment_method: params.paymentMethod,
-        subtotal: params.subtotal,
-        discount_amount: params.discountAmount,
-        total: finalTotal,
-        unique_cents_amount: uniqueCentsAmount || null,
-        status: initialStatus,
-        customer_notes: params.customerNotes || null,
-        pre_purchase_answers: params.prePurchaseAnswers || {},
-        ip_address: params.ipAddress || null,
-        user_agent: params.userAgent || null,
-        expires_at: expiresAt,
-      })
-      .select('*')
-      .single();
-
-    if (orderError) {
-      console.warn('Advertencia al insertar orden en Supabase:', orderError.message || JSON.stringify(orderError));
-    } else {
-      createdOrderRecord = order;
-      // Insertar items de la orden en Supabase
-      const orderItemsToInsert = params.items.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        product_name: item.productName,
-        variant_name: item.variantName || null,
-        unit_price: item.unitPrice,
-        quantity: item.quantity,
-        total_price: item.unitPrice * item.quantity,
-      }));
-      await supabase.from('order_items').insert(orderItemsToInsert);
+  const orderItems = normalizedItems.map((requested) => {
+    const product = productMap.get(requested.productId)!;
+    const variant = requested.variantId ? variantMap.get(requested.variantId) : undefined;
+    if (requested.variantId && (!variant || variant.product_id !== product.id)) {
+      throw new Error(`La variante de ${product.name} no es válida`);
     }
-  } catch (dbErr) {
-    console.warn('Error conectando a Supabase DB para orden:', dbErr);
-  }
 
-  // Guardar la orden en lux_admin_orders y lux_order_{orderNumber} para persistencia completa
-  try {
-    const localOrderObj = {
-      id: createdOrderRecord?.id || `ord_${orderNumber}`,
-      order_number: orderNumber,
-      customer_email: params.customerEmail,
-      payment_method: params.paymentMethod,
-      total: finalTotal,
-      subtotal: params.subtotal,
-      discount_amount: params.discountAmount,
-      status: initialStatus,
-      created_at: new Date().toISOString(),
-      items: params.items.map((it) => ({
-        name: it.productName,
-        product_name: it.productName,
-        variant_name: it.variantName,
-        unit_price: it.unitPrice,
-        quantity: it.quantity,
-        total_price: it.unitPrice * it.quantity,
-      })),
-      deliveries: [],
+    const unitPrice = Number(
+      variant
+        ? variant.sale_price ?? variant.price
+        : product.sale_price ?? product.base_price
+    );
+
+    return {
+      product_id: product.id,
+      variant_id: variant?.id || null,
+      product_name: product.name,
+      variant_name: variant?.name || null,
+      unit_price: unitPrice,
+      quantity: requested.quantity,
+      total_price: unitPrice * requested.quantity,
     };
+  });
 
-    localStorage.setItem(`lux_order_${orderNumber}`, JSON.stringify(localOrderObj));
-
-    const storedAdminOrders = localStorage.getItem('lux_admin_orders');
-    const adminOrders: any[] = storedAdminOrders ? JSON.parse(storedAdminOrders) : [];
-    localStorage.setItem('lux_admin_orders', JSON.stringify([localOrderObj, ...adminOrders]));
-  } catch (err) {
-    console.error('Error guardando orden local:', err);
+  for (const item of orderItems) {
+    let stockQuery = supabase
+      .from('inventory_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', item.product_id)
+      .eq('status', 'AVAILABLE');
+    stockQuery = item.variant_id
+      ? stockQuery.eq('variant_id', item.variant_id)
+      : stockQuery.is('variant_id', null);
+    const { count, error } = await stockQuery;
+    if (error) throw new Error('No se pudo comprobar el inventario');
+    if ((count || 0) < item.quantity) {
+      throw new Error(`Stock insuficiente para ${item.product_name}`);
+    }
   }
 
-  // 1. SIEMPRE enviar correo de instrucciones SPEI por Resend al generar pedido SPEI
+  const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0);
+  let discountAmount = 0;
+  let coupon: any = null;
+  if (params.couponCode) {
+    const { data } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', params.couponCode.trim().toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+    const isUsable = data
+      && (!data.expiration_date || new Date(data.expiration_date) >= new Date())
+      && (Number(data.min_purchase) || 0) <= subtotal
+      && (!(Number(data.max_uses) > 0) || Number(data.uses_count) < Number(data.max_uses));
+    if (!isUsable) throw new Error('El cupón ya no es válido');
+    coupon = data;
+    const raw = data.discount_type === 'percentage'
+      ? subtotal * Number(data.discount_value) / 100
+      : Number(data.discount_value);
+    discountAmount = Math.min(subtotal, raw);
+  }
+  const total = subtotal - discountAmount;
+  const orderNumber = generateOrderNumber();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      order_number: orderNumber,
+      user_id: params.userId || null,
+      customer_email: params.customerEmail.trim().toLowerCase(),
+      payment_method: params.paymentMethod,
+      subtotal,
+      discount_amount: discountAmount,
+      total,
+      status: 'PENDING_PAYMENT',
+      customer_notes: params.customerNotes || null,
+      ip_address: params.ipAddress || null,
+      user_agent: params.userAgent || null,
+      expires_at: expiresAt,
+    })
+    .select('*')
+    .single();
+
+  if (orderError || !order) throw new Error(orderError?.message || 'No se pudo crear el pedido');
+
+  const { error: itemsError } = await supabase
+    .from('order_items')
+    .insert(orderItems.map((item) => ({ ...item, order_id: order.id })));
+
+  if (itemsError) {
+    await supabase.from('orders').delete().eq('id', order.id);
+    throw new Error('No se pudieron guardar todos los productos del pedido');
+  }
+
+  if (coupon) {
+    await supabase.from('coupon_redemptions').insert({
+      coupon_id: coupon.id,
+      user_id: params.userId || null,
+      order_id: order.id,
+      discount_applied: discountAmount,
+    });
+    await supabase
+      .from('coupons')
+      .update({ uses_count: Number(coupon.uses_count || 0) + 1 })
+      .eq('id', coupon.id);
+  }
+
+  let emailSent: boolean | undefined;
+  let deliveryMessage: string | undefined;
+
   if (params.paymentMethod === 'spei') {
-    console.log(`Disparando correo Resend de pago pendiente SPEI para ${params.customerEmail}...`);
-    await sendPaymentPendingEmail({
-      toEmail: params.customerEmail,
+    emailSent = await sendPaymentPendingEmail({
+      toEmail: order.customer_email,
       orderNumber,
-      paymentMethod: params.paymentMethod,
-      totalAmount: finalTotal,
+      paymentMethod: 'spei',
+      totalAmount: total,
     });
   }
 
-  // 2. Si se pagó con créditos, procesar entrega de stock y correo de entrega por Resend
   if (params.paymentMethod === 'credits') {
-    console.log(`Disparando entrega automática de stock por créditos para orden ${orderNumber}...`);
-    await deliverOrder(orderNumber);
+    if (!params.userId) throw new Error('Debes iniciar sesión para pagar con créditos');
+    const { error: chargeError } = await supabase.rpc('charge_wallet_for_order', {
+      p_order_id: order.id,
+    });
+    if (chargeError) {
+      await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', order.id);
+      throw new Error(
+        chargeError.message.includes('INSUFFICIENT_CREDITS')
+          ? 'Saldo de créditos insuficiente'
+          : 'No se pudo cobrar el monedero'
+      );
+    }
+    const delivery = await deliverOrder(order.id);
+    deliveryMessage = delivery.message;
   }
 
-  return {
-    success: true,
-    order: createdOrderRecord,
-    orderNumber,
-  };
+  return { order: order as Order, emailSent, deliveryMessage };
 }
 
-/**
- * Consulta el estado de una orden por su número
- */
 export async function getOrderByNumber(orderNumber: string): Promise<Order | null> {
-  try {
-    const supabase = createAdminClient();
-    const { data: order, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        items:order_items(*),
-        deliveries:deliveries(*)
-      `)
-      .eq('order_number', orderNumber)
-      .single();
-
-    if (error || !order) return null;
-    return order as Order;
-  } catch (e) {
-    console.error('Error al consultar orden:', e);
-    return null;
-  }
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, items:order_items(*), deliveries:deliveries(*)')
+    .eq('order_number', orderNumber)
+    .maybeSingle();
+  return error ? null : (data as Order | null);
 }

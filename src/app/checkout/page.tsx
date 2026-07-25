@@ -13,10 +13,10 @@ import {
   Copy,
   LifeBuoy
 } from 'lucide-react';
-import { createOrder } from '@/services/orderService';
 import { PaymentMethod } from '@/types';
 import { LUX_BANK_INFO } from '@/data/luxCatalog';
 import { QuickSupportModal } from '@/components/QuickSupportModal';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -45,17 +45,17 @@ export default function CheckoutPage() {
         setCoupon(JSON.parse(storedCoupon));
       }
 
-      // Limpiar datos demo anteriores de localStorage si existía 10000
-      const storedCredits = localStorage.getItem('lux_user_credits');
-      if (storedCredits && (storedCredits === '10000.00' || storedCredits === '10000')) {
-        localStorage.setItem('lux_user_credits', '0.00');
-        setUserCredits(0.00);
-      } else if (storedCredits) {
-        setUserCredits(parseFloat(storedCredits));
-      } else {
-        setUserCredits(0.00);
-        localStorage.setItem('lux_user_credits', '0.00');
-      }
+      const supabase = createClient();
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (!user) return;
+        setEmail(user.email || '');
+        const { data: wallet } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setUserCredits(Number(wallet?.balance || 0));
+      });
     } catch (e) {
       console.error(e);
     }
@@ -101,64 +101,25 @@ export default function CheckoutPage() {
     setErrorMsg(null);
 
     try {
-      // 0. Validar stock estricto antes de procesar el pago
-      const storedProds = localStorage.getItem('lux_admin_products');
-      const adminProducts: any[] = storedProds ? JSON.parse(storedProds) : [];
-
-      for (const item of cartItems) {
-        const prod = adminProducts.find((p) => p.id === item.product_id || p.id === item.id || p.slug === item.slug);
-        if (prod && (prod.stock === 0 || prod.stock === '0')) {
-          setLoading(false);
-          setErrorMsg(`El producto "${item.name}" se encuentra agotado (Sin Stock). Por favor elimínalo de tu carrito para continuar.`);
-          return;
-        }
-      }
-
-      // 1. Crear la orden y enviar correo por Resend
-      const res = await createOrder({
+      const orderResponse = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
         customerEmail: email,
         paymentMethod,
         items: cartItems.map((item) => ({
           productId: item.product_id || item.id,
           variantId: item.variant_id,
-          productName: item.name,
-          variantName: item.variant_name,
-          unitPrice: item.sale_price || item.base_price,
-          quantity: item.quantity,
+          quantity: Number(item.quantity) || 1,
         })),
-        subtotal,
-        discountAmount,
-        total,
         customerNotes,
+        couponCode: coupon.code,
+        }),
       });
+      const res = await orderResponse.json();
+      if (!orderResponse.ok) throw new Error(res.error || 'No se pudo crear el pedido');
 
-      const orderNumber = res.orderNumber || `LX-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      // Guardar registro local del pedido para que la vista preserve la orden y el metodo
-      const localOrderData = {
-        order_number: orderNumber,
-        customer_email: email,
-        payment_method: paymentMethod,
-        total,
-        items: cartItems.map((it) => ({
-          id: it.product_id || it.id,
-          product_id: it.product_id || it.id,
-          name: it.name,
-          product_name: it.name,
-          variant_name: it.variant_name || it.variantName,
-          unit_price: it.sale_price || it.base_price,
-          quantity: Number(it.quantity) || 1,
-          total_price: (it.sale_price || it.base_price) * (Number(it.quantity) || 1),
-        })),
-      };
-      localStorage.setItem(`lux_order_${orderNumber}`, JSON.stringify(localOrderData));
-
-      // Si se pagó con créditos, deducir el saldo
-      if (paymentMethod === 'credits') {
-        const newBalance = Math.max(0, userCredits - total);
-        setUserCredits(newBalance);
-        localStorage.setItem('lux_user_credits', newBalance.toString());
-      }
+      const orderNumber = res.orderNumber;
 
       // Vaciar carrito
       localStorage.removeItem('lux_cart');
@@ -171,7 +132,7 @@ export default function CheckoutPage() {
           const clipApiRes = await fetch('/api/payments/clip', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderNumber, total }),
+            body: JSON.stringify({ orderNumber }),
           });
           const clipData = await clipApiRes.json();
           if (clipData && clipData.url && !clipData.simulated) {
@@ -181,7 +142,7 @@ export default function CheckoutPage() {
         } catch (clipErr) {
           console.error('Error al generar pasarela Clip:', clipErr);
         }
-        router.push(`/order/${orderNumber}?method=clip`);
+        throw new Error('No se pudo abrir Clip. Revisa el token de Checkout.');
       } else if (paymentMethod === 'spei') {
         router.push(`/order/${orderNumber}?method=spei`);
       } else {
@@ -190,7 +151,7 @@ export default function CheckoutPage() {
     } catch (e: any) {
       console.error(e);
       setLoading(false);
-      setErrorMsg('Ocurrió un error al procesar el pago. Inténtalo de nuevo.');
+      setErrorMsg(e?.message || 'Ocurrió un error al procesar el pago. Inténtalo de nuevo.');
     }
   };
 
@@ -372,11 +333,11 @@ export default function CheckoutPage() {
                     <div className="font-bold text-white">{item.name}</div>
                     {item.variant_name && <div className="text-[11px] text-[#C5A880]">{item.variant_name}</div>}
                     <div className="text-zinc-500 font-mono text-[11px] mt-1">
-                      Cantidad: <span className="text-[#C5A880] font-bold">1 unidad</span>
+                      Cantidad: <span className="text-[#C5A880] font-bold">{Number(item.quantity) || 1} unidad(es)</span>
                     </div>
                   </div>
                   <div className="font-mono text-white font-bold">
-                    ${(item.sale_price || item.base_price || 0).toFixed(2)} MXN
+                    ${((item.sale_price || item.base_price || 0) * (Number(item.quantity) || 1)).toFixed(2)} MXN
                   </div>
                 </div>
               ))}

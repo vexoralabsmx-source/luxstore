@@ -1,4 +1,10 @@
-const DEFAULT_KEY = process.env.INVENTORY_ENCRYPTION_KEY || 'a3f81e9b2c7d4a6e8f015c92d3b4e5f67a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d';
+function getKey(): string {
+  const key = process.env.INVENTORY_ENCRYPTION_KEY;
+  if (!key || key.length < 32) {
+    throw new Error('INVENTORY_ENCRYPTION_KEY debe tener al menos 32 caracteres');
+  }
+  return key.slice(0, 32);
+}
 
 /**
  * Cifra contenido sensible de stock (cuentas, licencias, códigos) de forma universal
@@ -7,7 +13,7 @@ const DEFAULT_KEY = process.env.INVENTORY_ENCRYPTION_KEY || 'a3f81e9b2c7d4a6e8f0
 export function encryptStockContent(text: string): string {
   if (!text) return text;
   try {
-    const key = DEFAULT_KEY.slice(0, 32);
+    const key = getKey();
     let result = '';
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i) ^ key.charCodeAt(i % key.length);
@@ -34,7 +40,7 @@ export function decryptStockContent(encryptedPayload: string): string {
     return encryptedPayload;
   }
   try {
-    const key = DEFAULT_KEY.slice(0, 32);
+    const key = getKey();
     const encoded = encryptedPayload.slice(4);
     const text = decodeURIComponent(escape(atob(encoded)));
     let result = '';

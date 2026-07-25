@@ -16,7 +16,6 @@ import {
   PackageX,
   Database
 } from 'lucide-react';
-import { LUX_PRODUCTS } from '@/data/luxCatalog';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -41,43 +40,17 @@ export default function AdminProductsPage() {
     loadProductsAndStock();
   }, []);
 
-  const loadProductsAndStock = () => {
+  const loadProductsAndStock = async () => {
     try {
-      // 1. Contar stock real cargado en el inventario ('lux_admin_inventory')
-      const storedInv = localStorage.getItem('lux_admin_inventory');
+      const response = await fetch('/api/admin/products', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setProducts(payload.products || []);
       const counts: Record<string, number> = {};
-
-      if (storedInv) {
-        const inventory: any[] = JSON.parse(storedInv);
-        inventory.forEach((item) => {
-          if (item.status === 'AVAILABLE') {
-            const pName = item.product_name?.toLowerCase() || '';
-            counts[pName] = (counts[pName] || 0) + 1;
-          }
-        });
-      }
-
+      payload.products?.forEach((product: any) => {
+        counts[String(product.name).toLowerCase()] = Number(product.stock) || 0;
+      });
       setInventoryStockMap(counts);
-
-      // 2. Cargar lista de productos del catálogo desde localStorage o vacío
-      const storedProds = localStorage.getItem('lux_admin_products');
-      if (storedProds) {
-        setProducts(JSON.parse(storedProds));
-      } else {
-        setProducts([]);
-        localStorage.setItem('lux_admin_products', JSON.stringify([]));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const saveProductsToStorage = (updatedProducts: any[]) => {
-    setProducts(updatedProducts);
-    try {
-      localStorage.setItem('lux_admin_products', JSON.stringify(updatedProducts));
-      window.dispatchEvent(new Event('products-updated'));
-      window.dispatchEvent(new Event('storage'));
     } catch (e) {
       console.error(e);
     }
@@ -136,46 +109,47 @@ export default function AdminProductsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
 
     const generatedSlug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    if (editingProduct) {
-      const updated = products.map((p) =>
-        p.id === editingProduct.id
-          ? {
-              ...p,
-              ...formData,
-              slug: generatedSlug,
-            }
-          : p
-      );
-      saveProductsToStorage(updated);
-    } else {
-      const newProduct = {
-        id: `prod_${Date.now()}`,
-        ...formData,
+    const response = await fetch('/api/admin/products', {
+      method: editingProduct ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...(editingProduct ? { id: editingProduct.id } : {}),
+        name: formData.name,
         slug: generatedSlug,
-      };
-      saveProductsToStorage([newProduct, ...products]);
+        category: formData.category,
+        base_price: Number(formData.base_price),
+        sale_price: Number(formData.sale_price),
+        warranty_days: Number(formData.warranty_days),
+        image_url: formData.image_url,
+        description: formData.description,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      alert(payload.error || 'No se pudo guardar el producto');
+      return;
     }
-
     setShowModal(false);
+    await loadProductsAndStock();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('¿Deseas eliminar este producto del catálogo?')) {
-      const updated = products.filter((p) => p.id !== id);
-      saveProductsToStorage(updated);
+      const response = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const payload = await response.json();
+      if (!response.ok) alert(payload.error || 'No se pudo eliminar');
+      await loadProductsAndStock();
     }
   };
 
   const handleClearAllProducts = () => {
-    if (confirm('¿Deseas vaciar completamente todos los productos para subirlos desde cero?')) {
-      saveProductsToStorage([]);
-    }
+    alert('Elimina cada producto de forma individual para evitar borrar inventario o pedidos por accidente.');
   };
 
   return (

@@ -12,8 +12,6 @@ import {
   Trash2,
   Package
 } from 'lucide-react';
-import { encryptStockContent } from '@/lib/crypto';
-import { LUX_PRODUCTS } from '@/data/luxCatalog';
 
 export default function AdminInventoryPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -34,97 +32,45 @@ export default function AdminInventoryPage() {
     return () => window.removeEventListener('products-updated', loadInventoryAndProducts);
   }, []);
 
-  const loadInventoryAndProducts = () => {
+  const loadInventoryAndProducts = async () => {
     try {
-      // 1. Cargar inventario
-      const storedInv = localStorage.getItem('lux_admin_inventory');
-      if (storedInv) {
-        setItems(JSON.parse(storedInv));
-      } else {
-        setItems([]);
-        localStorage.setItem('lux_admin_inventory', '[]');
-      }
-
-      // 2. Cargar productos creados por el administrador
-      const storedProds = localStorage.getItem('lux_admin_products');
-      let loadedProds: any[] = [];
-      if (storedProds) {
-        loadedProds = JSON.parse(storedProds);
-      }
-      
-      if (!loadedProds || loadedProds.length === 0) {
-        loadedProds = LUX_PRODUCTS;
-      }
-
-      setProductsList(loadedProds);
-      if (loadedProds.length > 0 && !selectedProductSlug) {
-        setSelectedProductSlug(loadedProds[0].slug || loadedProds[0].id);
+      const response = await fetch('/api/admin/inventory', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setItems(payload.items || []);
+      setProductsList(payload.products || []);
+      if (payload.products?.length > 0 && !selectedProductSlug) {
+        setSelectedProductSlug(payload.products[0].id);
       }
     } catch (e) {
       console.error(e);
       setItems([]);
-      setProductsList(LUX_PRODUCTS);
+      setProductsList([]);
     }
   };
 
   const handleClearAllStock = () => {
-    if (confirm('¿Estás seguro de que deseas vaciar todo el inventario de llaves y credenciales? Esta acción no se puede deshacer.')) {
-      setItems([]);
-      localStorage.setItem('lux_admin_inventory', '[]');
-    }
+    alert('Elimina únicamente unidades disponibles de forma individual para proteger el historial de ventas.');
   };
 
-  const handleBulkAdd = (e: React.FormEvent) => {
+  const handleBulkAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkText.trim()) return;
 
-    let targetProduct = productsList.find(
-      (p) => p.slug === selectedProductSlug || p.id === selectedProductSlug
-    );
-
-    const productName = targetProduct ? targetProduct.name : (customProductName || selectedProductSlug || 'Producto Digital');
-    const variantName = targetProduct ? (targetProduct.delivery || 'Estándar') : 'Estándar';
-
     const lines = bulkText.split('\n').filter((l) => l.trim().length > 0);
-    const newItems = lines.map((line, index) => {
-      const encrypted = encryptStockContent(line.trim());
-      return {
-        id: `inv_new_${Date.now()}_${index}`,
-        product_name: productName,
-        variant_name: variantName,
-        content: line.trim(),
-        encrypted_content: encrypted,
-        status: 'AVAILABLE',
-        order_number: null,
-        created_at: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      };
+    const response = await fetch('/api/admin/inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: selectedProductSlug, lines: lines.map((line) => line.trim()) }),
     });
-
-    const updated = [...newItems, ...items];
-    setItems(updated);
-    localStorage.setItem('lux_admin_inventory', JSON.stringify(updated));
-
-    // Incrementar stock del producto en lux_admin_products
-    try {
-      const storedProds = localStorage.getItem('lux_admin_products');
-      if (storedProds) {
-        const prods: any[] = JSON.parse(storedProds);
-        const updatedProds = prods.map((p) => {
-          if (p.name.toLowerCase() === productName.toLowerCase() || p.slug === selectedProductSlug) {
-            const currentStock = p.stock !== undefined ? Number(p.stock) : 0;
-            return { ...p, stock: currentStock + lines.length };
-          }
-          return p;
-        });
-        localStorage.setItem('lux_admin_products', JSON.stringify(updatedProds));
-        window.dispatchEvent(new Event('products-updated'));
-      }
-    } catch (err) {
-      console.error(err);
+    const payload = await response.json();
+    if (!response.ok) {
+      alert(payload.error || 'No se pudo guardar el inventario');
+      return;
     }
-
     setBulkText('');
     setShowAddModal(false);
+    await loadInventoryAndProducts();
   };
 
   const toggleReveal = (id: string) => {

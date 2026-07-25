@@ -25,7 +25,7 @@ Se ha implementado un mecanismo de limitación de tasa por dirección IP en el m
 - **Respuesta HTTP:** Al sobrepasar el límite, el servidor responde automáticamente con código `429 Too Many Requests` y encabezado `Retry-After`.
 
 ### 2.2 Protección de Claves y Secretos del Servidor
-- Las claves sensibles como `SUPABASE_SERVICE_ROLE_KEY`, `CLIP_SECRET_KEY`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY` e `INVENTORY_ENCRYPTION_KEY` están restringidas exclusivamente al entorno de ejecución del servidor.
+- Las claves sensibles como `SUPABASE_SERVICE_ROLE_KEY`, `CLIP_AUTH_TOKEN`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY` e `INVENTORY_ENCRYPTION_KEY` están restringidas exclusivamente al entorno de ejecución del servidor.
 - Ninguna clave privada se expone al cliente o al paquete ejecutable del navegador web.
 - Las únicas variables expuestas al navegador son las identificadas de forma explícita con el prefijo `NEXT_PUBLIC_`.
 
@@ -61,13 +61,13 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Clip API Oficial
-CLIP_API_KEY=your-clip-api-key
-CLIP_SECRET_KEY=your-clip-secret-key
-CLIP_SANDBOX_MODE=true
+# Clip Checkout Redireccionado
+CLIP_AUTH_TOKEN=your-clip-checkout-auth-token
 
 # Resend Email API
 RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=Lux Store <ventas@tu-dominio-verificado.com>
+ADMIN_NOTIFICATION_EMAIL=admin@tu-dominio.com
 
 # Cloudflare Turnstile
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
@@ -91,7 +91,8 @@ npm install
 ### 4.2 Configuración de Base de Datos
 1. Inicie sesión en el panel de Supabase.
 2. Abra el Editor SQL y ejecute el script `supabase/schema.sql`.
-3. Opcionalmente, ejecute `supabase/seed.sql` para cargar los datos base de prueba.
+3. Ejecute después `supabase/migrations/20260725_reliable_orders_and_delivery.sql`.
+4. Opcionalmente, ejecute `supabase/seed.sql` únicamente si desea datos de catálogo de prueba.
 
 ### 4.3 Inicio en Desarrollo
 ```bash

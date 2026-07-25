@@ -3,17 +3,7 @@
 import React from 'react';
 import { RefreshCw, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
-const DEMO_REPLACEMENTS_ADMIN = [
-  {
-    id: 'rep_1',
-    ticket_number: 'TCK-9901',
-    order_number: 'LX-2026-881923',
-    product_name: 'Spotify Premium 1 Año',
-    reason: 'Contraseña incorrecta original',
-    approved_by: 'Owner Admin',
-    created_at: '2026-07-22 17:00',
-  },
-];
+const DEMO_REPLACEMENTS_ADMIN: any[] = [];
 
 export default function AdminReplacementsPage() {
   return (

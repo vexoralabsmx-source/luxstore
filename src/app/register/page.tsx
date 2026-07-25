@@ -21,15 +21,6 @@ export default function RegisterPage() {
 
     const formattedEmail = email.trim().toLowerCase();
 
-    // 1. Caso especial: Si el usuario intenta registrar el correo de Owner
-    if (formattedEmail === 'mikeangdhz@gmail.com') {
-      document.cookie = "lux_admin_session=true; path=/; max-age=86400; SameSite=Lax";
-      localStorage.setItem('lux_admin_session', JSON.stringify({ email: formattedEmail, role: 'owner', name: fullName || 'Owner Admin' }));
-      localStorage.setItem('lux_user_credits', '0.00');
-      router.push('/admin');
-      return;
-    }
-
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
@@ -43,22 +34,19 @@ export default function RegisterPage() {
       });
 
       if (error) {
-        document.cookie = "lux_user_session=true; path=/; max-age=86400; SameSite=Lax";
-        localStorage.setItem('lux_user_session', JSON.stringify({ email: formattedEmail, name: fullName, role: 'customer' }));
-        localStorage.setItem('lux_user_credits', '0.00');
-        router.push('/dashboard');
+        setErrorMsg(error.message);
+        setLoading(false);
         return;
       }
 
-      document.cookie = "lux_user_session=true; path=/; max-age=86400; SameSite=Lax";
-      localStorage.setItem('lux_user_session', JSON.stringify({ email: formattedEmail, name: fullName, role: 'customer' }));
-      localStorage.setItem('lux_user_credits', '0.00');
-      router.push('/dashboard');
+      if (data.session) {
+        router.push('/dashboard');
+      } else {
+        router.push('/login');
+      }
     } catch (err: any) {
-      document.cookie = "lux_user_session=true; path=/; max-age=86400; SameSite=Lax";
-      localStorage.setItem('lux_user_session', JSON.stringify({ email: formattedEmail, name: fullName || 'Cliente VIP', role: 'customer' }));
-      localStorage.setItem('lux_user_credits', '0.00');
-      router.push('/dashboard');
+      setErrorMsg(err?.message || 'No se pudo crear la cuenta');
+      setLoading(false);
     }
   };
 

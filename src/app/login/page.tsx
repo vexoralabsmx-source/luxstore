@@ -4,51 +4,39 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, ArrowRight, Crown } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null);
 
     const formattedEmail = email.trim().toLowerCase();
-
-    // Establecer cookies del navegador para middleware.ts
-    if (formattedEmail === 'mikeangdhz@gmail.com' || formattedEmail.includes('admin')) {
-      document.cookie = "lux_admin_session=true; path=/; max-age=86400; SameSite=Lax";
-      document.cookie = "lux_user_session=true; path=/; max-age=86400; SameSite=Lax";
-      
-      localStorage.setItem('lux_admin_session', JSON.stringify({ 
-        email: formattedEmail, 
-        role: 'owner',
-        name: 'Miguel Ángel Dorantes (Owner Admin)'
-      }));
-      
-      // Asegurar saldo real $0.00 MXN
-      if (!localStorage.getItem('lux_user_credits')) {
-        localStorage.setItem('lux_user_credits', '0.00');
-      }
-
-      window.location.href = '/admin';
-    } else {
-      document.cookie = "lux_user_session=true; path=/; max-age=86400; SameSite=Lax";
-
-      localStorage.setItem('lux_user_session', JSON.stringify({ 
-        email: formattedEmail, 
-        role: 'customer',
-        name: 'Cliente VIP'
-      }));
-
-      if (!localStorage.getItem('lux_user_credits')) {
-        localStorage.setItem('lux_user_credits', '0.00');
-      }
-
-      window.location.href = '/dashboard';
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: formattedEmail,
+      password,
+    });
+    if (error || !data.user) {
+      setErrorMsg('Correo o contraseña incorrectos');
+      setLoading(false);
+      return;
     }
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', data.user.id);
+    const isAdmin = roles?.some(({ role }) => role === 'owner' || role === 'admin');
+    router.push(isAdmin ? '/admin' : '/dashboard');
+    router.refresh();
   };
 
   return (
@@ -66,6 +54,11 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+              {errorMsg}
+            </div>
+          )}
           <div>
             <label className="block text-xs text-zinc-400 mb-1 font-mono uppercase">Correo Electrónico</label>
             <div className="relative">

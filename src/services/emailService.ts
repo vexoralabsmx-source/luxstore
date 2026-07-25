@@ -1,11 +1,19 @@
 import { Resend } from 'resend';
 
-const resendApiKey = process.env.RESEND_API_KEY || 're_esY2jkAc_EXC6tF62QBonuhXezcvozvck';
-const resend = new Resend(resendApiKey);
+const SENDER_EMAIL = process.env.RESEND_FROM_EMAIL;
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
 
-// Usar el remitente verificado por defecto de Resend (onboarding@resend.dev)
-const SENDER_EMAIL = 'Lux Store <onboarding@resend.dev>';
-const ADMIN_EMAIL = 'mikeangdhz@gmail.com';
+function getResend() {
+  if (!process.env.RESEND_API_KEY || !SENDER_EMAIL) {
+    throw new Error('Faltan RESEND_API_KEY o RESEND_FROM_EMAIL');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+}
+
+function getSenderEmail(): string {
+  if (!SENDER_EMAIL) throw new Error('Falta RESEND_FROM_EMAIL');
+  return SENDER_EMAIL;
+}
 
 export interface SendDeliveryEmailParams {
   toEmail: string;
@@ -135,14 +143,15 @@ export async function sendAdminSPEINotifyEmail(params: SendAdminSPEINotifyParams
 
     const htmlBody = buildEmailWrapper(innerContent, `ALERTA SPEI: Comprobante Recibido ${params.orderNumber}`);
 
-    const result = await resend.emails.send({
-      from: SENDER_EMAIL,
+    if (!ADMIN_EMAIL) throw new Error('Falta ADMIN_NOTIFICATION_EMAIL');
+    const result = await getResend().emails.send({
+      from: getSenderEmail(),
       to: [ADMIN_EMAIL],
       subject: `🔔 Alerta SPEI: Nuevo Comprobante para Pedido ${params.orderNumber} ($${params.totalAmount.toFixed(2)} MXN)`,
       html: htmlBody,
     });
 
-    console.log('Notificación SPEI enviada exitosamente a Admin Resend:', result);
+    if (result.error) throw new Error(result.error.message);
     return true;
   } catch (error) {
     console.error('Error al enviar notificación a admin:', error);
@@ -199,23 +208,25 @@ export async function sendDeliveryEmail(params: SendDeliveryEmailParams): Promis
     const htmlBody = buildEmailWrapper(innerContent, `Entrega Pedido ${params.orderNumber} — Lux Store`);
 
     // Intentar enviar al cliente y al administrador
-    const toRecipients = Array.from(new Set([params.toEmail, ADMIN_EMAIL])).filter(Boolean);
+    const toRecipients = Array.from(new Set([params.toEmail, ADMIN_EMAIL].filter(Boolean))) as string[];
+    let sent = 0;
 
     for (const recipient of toRecipients) {
       try {
-        const res = await resend.emails.send({
-          from: SENDER_EMAIL,
+        const res = await getResend().emails.send({
+          from: getSenderEmail(),
           to: [recipient],
           subject: `Entrega de tu Pedido ${params.orderNumber} — Lux Store (${params.deliveredItems.length} Accesos)`,
           html: htmlBody,
         });
-        console.log(`Resultado del envío de correo Resend a ${recipient}:`, res);
+        if (res.error) throw new Error(res.error.message);
+        sent++;
       } catch (e) {
         console.warn(`Aviso al enviar a ${recipient} vía Resend:`, e);
       }
     }
 
-    return true;
+    return sent > 0;
   } catch (error) {
     console.error('Error al enviar correo Resend:', error);
     return false;
@@ -272,22 +283,25 @@ export async function sendPaymentPendingEmail(params: SendPaymentPendingParams):
 
     const htmlBody = buildEmailWrapper(innerContent, `Instrucciones de Pago ${params.orderNumber} — Lux Store`);
 
-    const recipients = Array.from(new Set([params.toEmail, ADMIN_EMAIL])).filter(Boolean);
+    const recipients = Array.from(new Set([params.toEmail, ADMIN_EMAIL].filter(Boolean))) as string[];
+    let sent = 0;
 
     for (const recipient of recipients) {
       try {
-        await resend.emails.send({
-          from: SENDER_EMAIL,
+        const result = await getResend().emails.send({
+          from: getSenderEmail(),
           to: [recipient],
           subject: `Instrucciones de Pago para tu Pedido ${params.orderNumber} — Lux Store`,
           html: htmlBody,
         });
+        if (result.error) throw new Error(result.error.message);
+        sent++;
       } catch (e) {
         console.warn(`Aviso enviando instrucciones a ${recipient}:`, e);
       }
     }
 
-    return true;
+    return sent > 0;
   } catch (error) {
     console.error('Error al enviar correo de pago pendiente:', error);
     return false;

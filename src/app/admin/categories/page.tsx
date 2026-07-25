@@ -3,12 +3,7 @@
 import React, { useState } from 'react';
 import { FolderTree, Plus, Edit3, Trash2 } from 'lucide-react';
 
-const DEMO_CATEGORIES_ADMIN = [
-  { id: 'c1', name: 'Streaming & Entretenimiento', slug: 'streaming', count: 12, is_active: true },
-  { id: 'c2', name: 'Licencias de Software', slug: 'software-licenses', count: 24, is_active: true },
-  { id: 'c3', name: 'Gaming & Gift Cards', slug: 'gaming', count: 18, is_active: true },
-  { id: 'c4', name: 'Herramientas Developer & IA', slug: 'developer-ai', count: 8, is_active: true },
-];
+const DEMO_CATEGORIES_ADMIN: any[] = [];
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState(DEMO_CATEGORIES_ADMIN);

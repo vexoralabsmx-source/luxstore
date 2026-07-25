@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Users, Wallet, Ban, CheckCircle2, UserPlus, Search } from 'lucide-react';
-import { adjustWalletBalance } from '@/services/walletService';
 
 export interface CustomerData {
   id: string;
@@ -31,80 +30,51 @@ export default function AdminCustomersPage() {
     loadCustomers();
   }, []);
 
-  const loadCustomers = () => {
+  const loadCustomers = async () => {
     try {
-      const stored = localStorage.getItem('lux_admin_customers');
-      if (stored) {
-        setCustomers(JSON.parse(stored));
-      } else {
-        // Cargar clientes a partir de órdenes de compra realizadas en la tienda
-        const storedOrders = localStorage.getItem('lux_admin_orders');
-        const list: CustomerData[] = [];
-
-        if (storedOrders) {
-          const orders: any[] = JSON.parse(storedOrders);
-          orders.forEach((o, i) => {
-            if (o.customer_email && !list.some((c) => c.email === o.customer_email)) {
-              list.push({
-                id: `usr_${i + 1}`,
-                full_name: o.customer_name || o.customer_email.split('@')[0],
-                email: o.customer_email,
-                risk_level: 'LOW',
-                total_spent: o.total || 0,
-                credits: 0.00,
-                orders_count: 1,
-                is_blocked: false,
-                created_at: o.created_at || new Date().toISOString().slice(0, 10),
-              });
-            }
-          });
-        }
-
-        setCustomers(list);
-        localStorage.setItem('lux_admin_customers', JSON.stringify(list));
-      }
+      const response = await fetch('/api/admin/customers', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setCustomers(payload.customers || []);
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const saveCustomers = (newList: CustomerData[]) => {
-    setCustomers(newList);
-    localStorage.setItem('lux_admin_customers', JSON.stringify(newList));
   };
 
   const handleAdjustCredits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer) return;
 
-    await adjustWalletBalance({
+    const response = await fetch('/api/admin/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
       userId: selectedCustomer.id,
       amount: creditAmount,
       type: creditType,
       description: creditReason,
+      }),
     });
-
-    const updated = customers.map((c) =>
-      c.id === selectedCustomer.id
-        ? {
-            ...c,
-            credits:
-              creditType === 'ADMIN_CREDIT'
-                ? c.credits + creditAmount
-                : Math.max(0, c.credits - creditAmount),
-          }
-        : c
-    );
-
-    saveCustomers(updated);
+    const payload = await response.json();
+    if (!response.ok) {
+      setNotification(payload.error || 'No se pudo ajustar el saldo');
+      return;
+    }
+    await loadCustomers();
     setNotification(`¡Créditos ajustados correctamente para ${selectedCustomer.email}!`);
     setSelectedCustomer(null);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const toggleBlockStatus = (id: string) => {
-    const updated = customers.map((c) => (c.id === id ? { ...c, is_blocked: !c.is_blocked } : c));
-    saveCustomers(updated);
+  const toggleBlockStatus = async (id: string) => {
+    const customer = customers.find((item) => item.id === id);
+    if (!customer) return;
+    await fetch('/api/admin/customers', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: id, isBlocked: !customer.is_blocked }),
+    });
+    await loadCustomers();
   };
 
   const filteredCustomers = customers.filter(

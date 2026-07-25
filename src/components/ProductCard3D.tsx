@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Star, Zap, Eye, ShoppingCart, CheckCircle2, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -29,26 +29,6 @@ export function ProductCard3D({ product, onQuickView, onAddToCart }: ProductCard
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
-  const [realStock, setRealStock] = useState<number>(0);
-
-  useEffect(() => {
-    // Calcular stock real disponible desde el inventario en memoria/local storage
-    try {
-      const stored = localStorage.getItem('lux_admin_inventory');
-      if (stored) {
-        const inventory: any[] = JSON.parse(stored);
-        const count = inventory.filter(
-          (item) => item.status === 'AVAILABLE' && 
-          (item.product_name?.toLowerCase() === product.name?.toLowerCase() || item.product_id === product.id)
-        ).length;
-        setRealStock(count);
-      } else {
-        setRealStock(0);
-      }
-    } catch (e) {
-      setRealStock(0);
-    }
-  }, [product]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -135,10 +115,10 @@ export function ProductCard3D({ product, onQuickView, onAddToCart }: ProductCard
               {product.delivery}
             </span>
 
-            {realStock > 0 || (product.stock && product.stock > 0) ? (
+            {product.stock > 0 ? (
               <span className="flex items-center gap-1 text-emerald-400 font-bold text-[11px]">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                {realStock || product.stock} disponibles
+                {product.stock} disponibles
               </span>
             ) : (
               <span className="flex items-center gap-1 text-rose-500 font-bold text-[11px]">
@@ -172,7 +152,7 @@ export function ProductCard3D({ product, onQuickView, onAddToCart }: ProductCard
             <span>Ver</span>
           </Link>
 
-          {realStock > 0 || (product.stock && product.stock > 0) ? (
+          {product.stock > 0 ? (
             <button
               onClick={() => onAddToCart && onAddToCart(product)}
               className="px-3.5 py-2 rounded-lg bg-[#C5A880] text-black hover:bg-[#E8D8C8] transition-all text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md"

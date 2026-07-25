@@ -15,7 +15,7 @@ import {
   MessageCircle,
   AlertTriangle
 } from 'lucide-react';
-import { LUX_PRODUCTS, LUX_CATEGORIES, LUX_BANK_INFO, LUX_TERMS_AND_GUARANTEE } from '@/data/luxCatalog';
+import { LUX_CATEGORIES, LUX_BANK_INFO, LUX_TERMS_AND_GUARANTEE } from '@/data/luxCatalog';
 import { ProductCard3D } from '@/components/ProductCard3D';
 
 export default function CatalogPage() {
@@ -38,20 +38,15 @@ export default function CatalogPage() {
     };
   }, []);
 
-  const loadProducts = () => {
+  const loadProducts = async () => {
     try {
-      const stored = localStorage.getItem('lux_admin_products');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProductsList(parsed);
-          return;
-        }
-      }
-      setProductsList(LUX_PRODUCTS);
+      const response = await fetch('/api/catalog', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setProductsList(payload.products || []);
     } catch (e) {
       console.error(e);
-      setProductsList(LUX_PRODUCTS);
+      setProductsList([]);
     }
   };
 
@@ -61,7 +56,7 @@ export default function CatalogPage() {
       const categoryName = product.category_name || product.category || '';
       const matchesSearch = productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             categoryName.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory || product.slug === selectedCategory;
+      const matchesCategory = selectedCategory === 'all' || product.category_slug === selectedCategory;
       return matchesSearch && matchesCategory;
     }).sort((a, b) => {
       const priceA = a.sale_price || a.base_price || 0;
@@ -78,7 +73,7 @@ export default function CatalogPage() {
       let cart = stored ? JSON.parse(stored) : [];
       const index = cart.findIndex((item: any) => item.id === product.id);
       if (index > -1) {
-        cart[index].quantity = 1;
+        cart[index].quantity = Math.min(Number(product.stock) || 1, (Number(cart[index].quantity) || 1) + 1);
       } else {
         cart.push({ ...product, quantity: 1 });
       }
@@ -199,7 +194,7 @@ export default function CatalogPage() {
                 sale_price: product.sale_price || product.base_price || 0,
                 stock: product.stock || 0,
                 delivery: product.delivery || 'Entrega Instantánea',
-                image: product.image_url || product.image || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&auto=format&fit=crop&q=80',
+                image: product.image_url || product.image || '',
                 logo: product.logo || '',
                 brandColor: product.brandColor || '#C5A880',
                 rating: product.rating || 4.9,

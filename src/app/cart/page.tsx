@@ -42,8 +42,7 @@ export default function CartPage() {
       const stored = localStorage.getItem('lux_cart');
       if (stored) {
         const parsed: any[] = JSON.parse(stored);
-        const fixed = parsed.map((item) => ({ ...item, quantity: 1 }));
-        setCartItems(fixed);
+        setCartItems(parsed.map((item) => ({ ...item, quantity: Math.max(1, Number(item.quantity) || 1) })));
       } else {
         setCartItems([]);
       }
@@ -54,7 +53,8 @@ export default function CartPage() {
 
   const updateQuantity = (index: number, newQty: number) => {
     const updated = [...cartItems];
-    updated[index].quantity = 1;
+    const max = Math.max(1, Number(updated[index].stock) || 1);
+    updated[index].quantity = Math.max(1, Math.min(max, newQty));
     setCartItems(updated);
     localStorage.setItem('lux_cart', JSON.stringify(updated));
     window.dispatchEvent(new Event('cart-updated'));
@@ -175,10 +175,24 @@ export default function CartPage() {
               {/* Quantity Controls & Price */}
               <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-[#242424]">
                 
-                {/* Qty Badge */}
-                <div className="flex items-center gap-1.5 bg-[#050505] border border-[#242424] rounded-xl px-3 py-1.5 font-mono text-xs text-zinc-400">
-                  <span className="text-[#C5A880] font-bold">Cant: 1</span>
-                  <span className="text-[10px] text-zinc-500">(Máximo 1 por pedido)</span>
+                <div className="flex items-center gap-2 bg-[#050505] border border-[#242424] rounded-xl px-2 py-1.5 font-mono text-xs">
+                  <button
+                    onClick={() => updateQuantity(index, item.quantity - 1)}
+                    disabled={item.quantity <= 1}
+                    className="p-1 text-zinc-300 disabled:opacity-30"
+                    aria-label="Reducir cantidad"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[#C5A880] font-bold min-w-5 text-center">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(index, item.quantity + 1)}
+                    disabled={item.quantity >= Math.max(1, Number(item.stock) || 1)}
+                    className="p-1 text-zinc-300 disabled:opacity-30"
+                    aria-label="Aumentar cantidad"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Price */}

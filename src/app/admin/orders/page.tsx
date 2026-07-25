@@ -8,8 +8,6 @@ import {
   Zap, 
   RefreshCw
 } from 'lucide-react';
-import { deliverOrder } from '@/services/deliveryService';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -22,87 +20,29 @@ export default function AdminOrdersPage() {
 
   const fetchOrders = async () => {
     setLoading(true);
-    let allOrders: any[] = [];
-
-    // 1. Cargar pedidos desde la memoria local
     try {
-      const storedLocal = localStorage.getItem('lux_admin_orders');
-      if (storedLocal) {
-        allOrders = JSON.parse(storedLocal);
-      }
+      const response = await fetch('/api/admin/orders', { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setOrders(payload.orders || []);
     } catch (e) {
       console.error(e);
+      setOrders([]);
     }
-
-    // 2. Cargar pedidos desde Supabase DB
-    try {
-      const supabase = createAdminClient();
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (data && data.length > 0) {
-        const existingNumbers = new Set(allOrders.map((o) => o.order_number));
-        data.forEach((dbOrder) => {
-          if (!existingNumbers.has(dbOrder.order_number)) {
-            allOrders.push(dbOrder);
-          }
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    setOrders(allOrders);
     setLoading(false);
   };
 
   const handleApproveAndDeliver = async (orderNumber: string) => {
     setDeliveringId(orderNumber);
     
-    // Ejecutar entrega de backend (asigna inventario, cambia estado a DELIVERED y dispara Resend)
-    const res = await deliverOrder(orderNumber);
-
-    const deliveredItemsFormatted = (res.deliveredItems || []).map((item: any, idx: number) => ({
-      id: `del_${orderNumber}_${idx}`,
-      order_id: `ord_${orderNumber}`,
-      delivered_content: item.deliveredContent,
-      created_at: new Date().toISOString(),
-    }));
-
-    // Actualizar lista en estado local
-    const updated = orders.map((o) => {
-      if (o.order_number === orderNumber) {
-        return {
-          ...o,
-          status: 'DELIVERED',
-          deliveries: deliveredItemsFormatted,
-        };
-      }
-      return o;
+    const response = await fetch('/api/admin/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderNumber }),
     });
-
-    setOrders(updated);
-
-    try {
-      // Guardar en la lista global de ordenes de administracion
-      localStorage.setItem('lux_admin_orders', JSON.stringify(updated));
-
-      // Guardar especificamente en el objeto del pedido del cliente para reflejo inmediato al recargar
-      const currentOrderLocal = localStorage.getItem(`lux_order_${orderNumber}`);
-      const parsedLocal = currentOrderLocal ? JSON.parse(currentOrderLocal) : {};
-      const newClientOrderState = {
-        ...parsedLocal,
-        order_number: orderNumber,
-        status: 'DELIVERED',
-        deliveries: deliveredItemsFormatted,
-      };
-      localStorage.setItem(`lux_order_${orderNumber}`, JSON.stringify(newClientOrderState));
-    } catch (e) {
-      console.error(e);
-    }
-
+    const payload = await response.json();
+    if (!response.ok) alert(payload.error || payload.message || 'No se pudo entregar');
+    await fetchOrders();
     setDeliveringId(null);
   };
 

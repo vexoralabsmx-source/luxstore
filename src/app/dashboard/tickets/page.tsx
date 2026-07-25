@@ -23,35 +23,6 @@ interface Ticket {
   messages: TicketMessage[];
 }
 
-const INITIAL_DEMO_TICKETS: Ticket[] = [
-  {
-    id: 't1',
-    ticket_number: 'TCK-9901',
-    subject: 'Solicitud de Garantía — Spotify Premium',
-    order_number: 'LX-2026-881923',
-    category: 'Garantía / Reemplazo',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    created_at: '2026-07-22 14:30',
-    messages: [
-      {
-        id: 'm1',
-        sender_type: 'customer',
-        sender_name: 'Cliente VIP',
-        message: 'Hola, buenas tardes. Al ingresar a la cuenta de Spotify indica contraseña incorrecta.',
-        created_at: '2026-07-22 14:30',
-      },
-      {
-        id: 'm2',
-        sender_type: 'support',
-        sender_name: 'Soporte Lux Store',
-        message: 'Hola. He verificado tu garantía. En unos momentos te asignaremos una unidad de reemplazo.',
-        created_at: '2026-07-22 14:45',
-      },
-    ],
-  },
-];
-
 export default function CustomerTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -63,11 +34,11 @@ export default function CustomerTicketsPage() {
   const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
-    const loadAndSyncTickets = () => {
+    const loadAndSyncTickets = async () => {
       try {
-        const stored = localStorage.getItem('lux_tickets');
-        if (stored) {
-          const parsed = JSON.parse(stored);
+          const response = await fetch('/api/tickets', { cache: 'no-store' });
+          const payload = await response.json();
+          const parsed = response.ok ? payload.tickets || [] : [];
           setTickets(parsed);
           setSelectedTicket((prev) => {
             if (!prev && parsed.length > 0) return parsed[0];
@@ -77,11 +48,6 @@ export default function CustomerTicketsPage() {
             }
             return null;
           });
-        } else {
-          setTickets(INITIAL_DEMO_TICKETS);
-          setSelectedTicket(INITIAL_DEMO_TICKETS[0]);
-          localStorage.setItem('lux_tickets', JSON.stringify(INITIAL_DEMO_TICKETS));
-        }
       } catch (e) {
         console.error(e);
       }
@@ -91,82 +57,34 @@ export default function CustomerTicketsPage() {
 
     // Auto-Polling en segundo plano cada 3.5 segundos para reflejar respuestas del administrador al instante
     const interval = setInterval(loadAndSyncTickets, 3500);
-    window.addEventListener('storage', loadAndSyncTickets);
-    window.addEventListener('tickets-updated', loadAndSyncTickets);
-
     return () => {
       clearInterval(interval);
-      window.removeEventListener('storage', loadAndSyncTickets);
-      window.removeEventListener('tickets-updated', loadAndSyncTickets);
     };
   }, []);
 
-  const saveTickets = (updated: Ticket[]) => {
-    setTickets(updated);
-    localStorage.setItem('lux_tickets', JSON.stringify(updated));
-  };
-
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubject || !newMessageText) return;
 
-    const newTicket: Ticket = {
-      id: `t_${Date.now()}`,
-      ticket_number: `TCK-${Math.floor(1000 + Math.random() * 9000)}`,
-      subject: newSubject,
-      order_number: newOrderNumber || 'N/A',
-      category: newCategory,
-      status: 'OPEN',
-      priority: 'MEDIUM',
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      messages: [
-        {
-          id: `m_${Date.now()}`,
-          sender_type: 'customer',
-          sender_name: 'Cliente VIP',
-          message: newMessageText,
-          created_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
-        },
-      ],
-    };
-
-    const updated = [newTicket, ...tickets];
-    saveTickets(updated);
-    setSelectedTicket(newTicket);
+    await fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', subject: newSubject, category: newCategory, orderNumber: newOrderNumber || undefined, message: newMessageText }),
+    });
     setNewSubject('');
     setNewOrderNumber('');
     setNewMessageText('');
     setShowCreateModal(false);
   };
 
-  const handleSendReply = (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText || !selectedTicket) return;
 
-    const newMsg: TicketMessage = {
-      id: `m_${Date.now()}`,
-      sender_type: 'customer',
-      sender_name: 'Cliente VIP',
-      message: replyText,
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
-    };
-
-    const updatedTickets = tickets.map((t) => {
-      if (t.id === selectedTicket.id) {
-        return {
-          ...t,
-          status: 'OPEN' as const,
-          messages: [...t.messages, newMsg],
-        };
-      }
-      return t;
-    });
-
-    saveTickets(updatedTickets);
-    setSelectedTicket({
-      ...selectedTicket,
-      status: 'OPEN',
-      messages: [...selectedTicket.messages, newMsg],
+    await fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reply', ticketId: selectedTicket.id, message: replyText }),
     });
     setReplyText('');
   };

@@ -27,9 +27,6 @@ export function CommandPalette() {
 
   const commands = [
     { title: 'Ver Catálogo VIP Completo', href: '/catalog', category: 'Navegación', icon: Search },
-    { title: 'Spotify Premium 1 Año', href: '/product/spotify-premium-1-year', category: 'Productos', icon: Zap },
-    { title: 'Xbox Game Pass Ultimate (3 Meses)', href: '/product/xbox-game-pass-ultimate', category: 'Productos', icon: Zap },
-    { title: 'Licencia Windows 11 Pro Retail', href: '/product/windows-11-pro-license', category: 'Productos', icon: Zap },
     { title: 'Mi Bóveda Digital', href: '/dashboard/products', category: 'Cliente VIP', icon: KeyRound },
     { title: 'Mis Créditos & Billetera', href: '/dashboard/wallet', category: 'Cliente VIP', icon: Wallet },
     { title: 'Panel Admin — Cargar Stock Cifrado', href: '/admin/inventory', category: 'Administración', icon: Boxes },

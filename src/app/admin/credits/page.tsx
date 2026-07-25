@@ -3,26 +3,7 @@
 import React from 'react';
 import { Wallet, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
-const DEMO_CREDITS_ADMIN = [
-  {
-    id: 'tx_1',
-    user: 'Juan Pérez (cliente1@gmail.com)',
-    type: 'ADMIN_CREDIT',
-    amount: 500.00,
-    description: 'Depósito promocional de bienvenida Lux Store',
-    performed_by: 'Owner Admin',
-    created_at: '2026-07-20 14:30',
-  },
-  {
-    id: 'tx_2',
-    user: 'Juan Pérez (cliente1@gmail.com)',
-    type: 'PURCHASE',
-    amount: -199.00,
-    description: 'Compra de Licencia Windows 11 Pro Retail (LX-2026-119234)',
-    performed_by: 'Sistema Checkout',
-    created_at: '2026-07-15 11:15',
-  },
-];
+const DEMO_CREDITS_ADMIN: any[] = [];
 
 export default function AdminCreditsPage() {
   return (

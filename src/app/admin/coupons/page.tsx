@@ -3,43 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, Plus, Edit3, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import { CouponData } from '@/services/couponService';
-import { createAdminClient } from '@/lib/supabase/admin';
-
-const INITIAL_COUPONS: CouponData[] = [
-  {
-    id: 'c1',
-    code: 'LUX10',
-    discount_type: 'percentage',
-    discount_value: 10,
-    min_purchase: 0,
-    uses_count: 14,
-    max_uses: 1000,
-    is_active: true,
-  },
-  {
-    id: 'c2',
-    code: 'LUX20',
-    discount_type: 'percentage',
-    discount_value: 20,
-    min_purchase: 100,
-    uses_count: 5,
-    max_uses: 1000,
-    is_active: true,
-  },
-  {
-    id: 'c3',
-    code: 'BIENVENIDA',
-    discount_type: 'fixed',
-    discount_value: 50,
-    min_purchase: 100,
-    uses_count: 8,
-    max_uses: 1000,
-    is_active: true,
-  },
-];
 
 export default function AdminCouponsPage() {
-  const [coupons, setCoupons] = useState<CouponData[]>(INITIAL_COUPONS);
+  const [coupons, setCoupons] = useState<CouponData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [code, setCode] = useState('');
   const [value, setValue] = useState<number>(10);
@@ -49,25 +15,13 @@ export default function AdminCouponsPage() {
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('lux_coupons');
-      if (stored) {
-        setCoupons(JSON.parse(stored));
-      } else {
-        localStorage.setItem('lux_coupons', JSON.stringify(INITIAL_COUPONS));
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    loadCoupons();
   }, []);
 
-  const saveCoupons = (newList: CouponData[]) => {
-    setCoupons(newList);
-    try {
-      localStorage.setItem('lux_coupons', JSON.stringify(newList));
-    } catch (e) {
-      console.error(e);
-    }
+  const loadCoupons = async () => {
+    const response = await fetch('/api/admin/coupons', { cache: 'no-store' });
+    const payload = await response.json();
+    if (response.ok) setCoupons(payload.coupons || []);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -75,7 +29,6 @@ export default function AdminCouponsPage() {
     if (!code.trim()) return;
 
     const newCoupon: CouponData = {
-      id: `c_${Date.now()}`,
       code: code.trim().toUpperCase(),
       discount_type: type,
       discount_value: Number(value),
@@ -85,24 +38,17 @@ export default function AdminCouponsPage() {
       is_active: true,
     };
 
-    // 1. Guardar en Supabase si está disponible
-    try {
-      const supabase = createAdminClient();
-      await supabase.from('coupons').insert({
-        code: newCoupon.code,
-        discount_type: newCoupon.discount_type,
-        discount_value: newCoupon.discount_value,
-        min_purchase: newCoupon.min_purchase,
-        max_uses: newCoupon.max_uses,
-        is_active: true,
-      });
-    } catch (e) {
-      console.warn('Supabase not available for coupon insert, saved in local state:', e);
+    const response = await fetch('/api/admin/coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCoupon),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setNotification(payload.error || 'No se pudo crear el cupón');
+      return;
     }
-
-    // 2. Guardar en estado persistente local
-    const updated = [newCoupon, ...coupons.filter((c) => c.code !== newCoupon.code)];
-    saveCoupons(updated);
+    await loadCoupons();
 
     setNotification(`¡Cupón ${newCoupon.code} creado exitosamente y activo en la tienda!`);
     setCode('');
@@ -112,14 +58,20 @@ export default function AdminCouponsPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const toggleStatus = (id: string) => {
-    const updated = coupons.map((c) => (c.id === id ? { ...c, is_active: !c.is_active } : c));
-    saveCoupons(updated);
+  const toggleStatus = async (id: string) => {
+    const coupon = coupons.find((item) => item.id === id);
+    if (!coupon) return;
+    await fetch('/api/admin/coupons', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_active: !coupon.is_active }),
+    });
+    await loadCoupons();
   };
 
-  const deleteCoupon = (id: string) => {
-    const updated = coupons.filter((c) => c.id !== id);
-    saveCoupons(updated);
+  const deleteCoupon = async (id: string) => {
+    await fetch(`/api/admin/coupons?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await loadCoupons();
   };
 
   return (
