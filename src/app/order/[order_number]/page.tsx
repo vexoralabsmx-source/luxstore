@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Building2,
   CheckCircle2,
+  Clock3,
   Copy,
   CreditCard,
   Eye,
@@ -26,22 +27,29 @@ export default function OrderStatusPage() {
   const [error, setError] = useState('');
   const [txid, setTxid] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reconcilingClip, setReconcilingClip] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
   const loadOrder = useCallback(async () => {
-    const response = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, {
-      cache: 'no-store',
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error || 'Pedido no encontrado');
-      setOrder(null);
-    } else {
-      setOrder(payload.order);
-      setCanViewDelivery(payload.canViewDelivery);
-      setError('');
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`, {
+        cache: 'no-store',
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.error || 'Pedido no encontrado');
+        setOrder(null);
+      } else {
+        setOrder(payload.order);
+        setCanViewDelivery(payload.canViewDelivery);
+        setError('');
+      }
+    } catch {
+      setError('No pudimos actualizar el pedido. Reintentaremos automáticamente.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [orderNumber]);
 
   useEffect(() => {
@@ -49,6 +57,58 @@ export default function OrderStatusPage() {
     const timer = window.setInterval(loadOrder, 5000);
     return () => window.clearInterval(timer);
   }, [loadOrder]);
+
+  useEffect(() => {
+    const returnedFromClip =
+      new URLSearchParams(window.location.search).get('clip_status') === 'success';
+    if (!returnedFromClip) return;
+
+    let active = true;
+    const reconcilePayment = async () => {
+      setReconcilingClip(true);
+      setPaymentNotice('Pago recibido. Estamos confirmándolo directamente con Clip…');
+
+      try {
+        const response = await fetch('/api/payments/clip', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNumber }),
+        });
+        const payload = await response.json();
+        if (!active) return;
+
+        if (response.ok) {
+          setPaymentNotice(
+            payload.status === 'delivered'
+              ? 'Pago confirmado. Tu pedido ya fue procesado correctamente.'
+              : 'Pago confirmado. Estamos preparando tu entrega.'
+          );
+          await loadOrder();
+        } else if (response.status === 202) {
+          setPaymentNotice('Clip está terminando de confirmar el pago. No vuelvas a pagar.');
+        } else {
+          setPaymentNotice(
+            payload.message ||
+              payload.error ||
+              'Recibimos tu regreso desde Clip. No vuelvas a pagar; revisaremos el pedido.'
+          );
+        }
+      } catch {
+        if (active) {
+          setPaymentNotice(
+            'Recibimos tu regreso desde Clip. No vuelvas a pagar; reintentaremos la confirmación.'
+          );
+        }
+      } finally {
+        if (active) setReconcilingClip(false);
+      }
+    };
+
+    reconcilePayment();
+    return () => {
+      active = false;
+    };
+  }, [loadOrder, orderNumber]);
 
   const openClip = async () => {
     setBusy(true);
@@ -101,9 +161,39 @@ export default function OrderStatusPage() {
   }
 
   const delivered = order.status === 'DELIVERED';
+  const paid = order.status === 'PAID' || order.status === 'PROCESSING' || delivered;
+  const statusLabel: Record<string, string> = {
+    PENDING_PAYMENT: 'Esperando confirmación',
+    PAID: 'Pago confirmado',
+    PROCESSING: 'Preparando entrega',
+    DELIVERED: 'Entregado',
+    CANCELLED: 'Cancelado',
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
+      {paymentNotice && (
+        <div
+          className={`rounded-2xl border p-5 flex items-start gap-3 ${
+            paid
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+          }`}
+        >
+          {paid ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          ) : (
+            <Clock3 className={`w-5 h-5 text-amber-400 flex-shrink-0 ${reconcilingClip ? 'animate-pulse' : ''}`} />
+          )}
+          <div>
+            <strong className="text-sm block">
+              {paid ? 'Compra protegida y confirmada' : 'Confirmando tu pago seguro'}
+            </strong>
+            <p className="text-xs mt-1 opacity-90">{paymentNotice}</p>
+          </div>
+        </div>
+      )}
+
       <div className="glass-vip-card rounded-3xl p-6 sm:p-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -115,7 +205,7 @@ export default function OrderStatusPage() {
               ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
               : 'text-amber-400 border-amber-500/30 bg-amber-500/10'
           }`}>
-            {order.status}
+            {statusLabel[order.status] || order.status}
           </span>
         </div>
 
@@ -149,7 +239,10 @@ export default function OrderStatusPage() {
         ))}
       </div>
 
-      {order.payment_method === 'clip' && order.status === 'PENDING_PAYMENT' && (
+      {order.payment_method === 'clip' &&
+        order.status === 'PENDING_PAYMENT' &&
+        !reconcilingClip &&
+        !paymentNotice && (
         <button
           onClick={openClip}
           disabled={busy}

@@ -15,7 +15,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Falta payment_request_id' }, { status: 400 });
     }
 
-    if (webhookStatus && webhookStatus !== 'COMPLETED') {
+    if (
+      webhookStatus &&
+      !['COMPLETED', 'CHECKOUT_COMPLETED'].includes(webhookStatus)
+    ) {
       return NextResponse.json({ status: 'ignored', resource_status: webhookStatus });
     }
 

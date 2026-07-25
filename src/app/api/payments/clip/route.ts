@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClipPaymentRequest } from '@/lib/clip';
+import { createClipPaymentRequest, getClipPaymentStatus } from '@/lib/clip';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deliverOrder } from '@/services/deliveryService';
 
 export const runtime = 'edge';
 
@@ -73,5 +74,75 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : 'No se pudo iniciar Clip';
     console.error('Error iniciando Clip:', error);
     return NextResponse.json({ error: message }, { status: 502 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Pedido inválido' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select('id, order_number, status, payment_reference')
+      .eq('order_number', parsed.data.orderNumber)
+      .eq('payment_method', 'clip')
+      .maybeSingle();
+
+    if (error || !order) {
+      return NextResponse.json({ error: 'Pedido Clip no encontrado' }, { status: 404 });
+    }
+
+    if (order.status === 'DELIVERED') {
+      return NextResponse.json({ status: 'delivered', order_number: order.order_number });
+    }
+
+    if (!order.payment_reference) {
+      return NextResponse.json(
+        { error: 'El pedido todavía no tiene una referencia de Clip' },
+        { status: 409 }
+      );
+    }
+
+    const verification = await getClipPaymentStatus(order.payment_reference);
+    if (!verification.isPaid) {
+      return NextResponse.json(
+        { status: 'processing', clip_status: verification.status },
+        { status: 202 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      supabase
+        .from('orders')
+        .update({ status: 'PAID', paid_at: now, updated_at: now })
+        .eq('id', order.id)
+        .neq('status', 'DELIVERED'),
+      supabase
+        .from('payments')
+        .update({ status: 'COMPLETED', updated_at: now })
+        .eq('order_id', order.id)
+        .eq('provider', 'clip'),
+    ]);
+
+    const delivery = await deliverOrder(order.id);
+    return NextResponse.json(
+      {
+        status: delivery.success ? 'delivered' : 'requires_attention',
+        order_number: order.order_number,
+        message: delivery.message,
+      },
+      { status: delivery.success ? 200 : 409 }
+    );
+  } catch (error) {
+    console.error('Error conciliando pago Clip:', error);
+    return NextResponse.json(
+      { error: 'No se pudo confirmar el pago con Clip. Reintentaremos automáticamente.' },
+      { status: 502 }
+    );
   }
 }
