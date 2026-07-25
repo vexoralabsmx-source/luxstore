@@ -1,43 +1,23 @@
 -- =========================================================
--- LUX STORE — SEED DATA (CREDENCIALES Y AJUSTES INICIALES)
+-- LUX STORE — DATOS INICIALES NO SENSIBLES
 -- =========================================================
 
--- 1. Insertar Perfil de Owner Admin
-INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, role)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'mikeangdhz@gmail.com',
-  crypt('M1kE2408*01', gen_salt('bf')),
-  NOW(),
-  'authenticated'
-) ON CONFLICT (id) DO NOTHING;
+-- Las cuentas administrativas deben crearse mediante Supabase Auth.
+-- Nunca guardes correos privados ni contraseñas dentro de este archivo.
 
-INSERT INTO public.profiles (id, full_name, email)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'Miguel Ángel Dorantes Hernández (Owner Admin)',
-  'mikeangdhz@gmail.com'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.user_roles (user_id, role)
-VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'owner'
-) ON CONFLICT (user_id, role) DO NOTHING;
-
--- 2. Configuración Global de la Tienda
+-- 1. Configuración Global de la Tienda
 INSERT INTO public.store_settings (id, store_name, currency, support_email)
 VALUES (
   1,
   'Lux Store',
   'MXN',
-  'mikeangdhz@gmail.com'
+  'soporte@example.com'
 ) ON CONFLICT (id) DO UPDATE SET
   store_name = EXCLUDED.store_name,
   currency = EXCLUDED.currency,
   support_email = EXCLUDED.support_email;
 
--- 3. Categorías Base
+-- 2. Categorías Base
 INSERT INTO public.categories (name, slug, description, is_active)
 VALUES
   ('Diseño y Productividad', 'diseno-productividad', 'Canva Pro, CapCut Pro, Scribd, Microsoft 365', true),

@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/dashboard/settings`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
@@ -29,7 +29,9 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      setSuccessMsg('Se ha enviado un enlace de recuperación a tu correo electrónico.');
+      setSuccessMsg(
+        'Si existe una cuenta con ese correo, recibirás un enlace de recuperación. Revisa también spam.'
+      );
       setLoading(false);
     } catch (e) {
       setErrorMsg('Error al procesar la solicitud. Inténtalo de nuevo.');
