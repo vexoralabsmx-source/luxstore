@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { createClipPaymentRequest } from '@/lib/clip';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const runtime = 'edge';
+
 const schema = z.object({ orderNumber: z.string().min(8).max(40) });
 
 export async function POST(request: Request) {

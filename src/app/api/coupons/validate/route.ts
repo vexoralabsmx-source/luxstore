@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   const parsed = z.object({
     code: z.string().trim().min(1).max(50),

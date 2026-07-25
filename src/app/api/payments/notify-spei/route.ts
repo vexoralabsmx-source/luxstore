@@ -4,6 +4,8 @@ import { sendAdminSPEINotifyEmail } from '@/services/emailService';
 import { sendDiscordAlert } from '@/services/discordService';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const runtime = 'edge';
+
 const schema = z.object({
   orderNumber: z.string().min(8).max(40),
   paymentReference: z.string().trim().min(4).max(120),

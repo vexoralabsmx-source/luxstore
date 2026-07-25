@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin';
 
+export const runtime = 'edge';
+
 export async function GET() {
   const context = await requireAdmin();
   if (!context) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });

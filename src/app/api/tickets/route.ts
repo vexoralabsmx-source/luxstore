@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const runtime = 'edge';
+
 async function currentUser() {
   const session = await createClient();
   const { data: { user } } = await session.auth.getUser();

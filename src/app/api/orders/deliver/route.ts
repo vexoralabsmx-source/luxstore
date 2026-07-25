@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deliverOrder } from '@/services/deliveryService';
 
+export const runtime = 'edge';
+
 const schema = z.object({ orderNumber: z.string().min(8).max(40) });
 
 export async function POST(request: Request) {

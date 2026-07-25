@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createOrder } from '@/services/orderService';
 
+export const runtime = 'edge';
+
 const requestSchema = z.object({
   customerEmail: z.string().email(),
   paymentMethod: z.enum(['clip', 'spei', 'credits']),

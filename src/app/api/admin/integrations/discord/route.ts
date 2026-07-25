@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin';
 import { sendDiscordAlert } from '@/services/discordService';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   const context = await requireAdmin();
   if (!context) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });

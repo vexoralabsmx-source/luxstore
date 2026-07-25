@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin';
 import { decryptStockContent, encryptStockContent } from '@/lib/crypto';
 
+export const runtime = 'edge';
+
 const addSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid().optional(),

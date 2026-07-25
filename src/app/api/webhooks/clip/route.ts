@@ -3,6 +3,8 @@ import { deliverOrder } from '@/services/deliveryService';
 import { getClipPaymentStatus } from '@/lib/clip';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

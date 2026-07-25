@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin';
 
+export const runtime = 'edge';
+
 const productSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2).max(120),
