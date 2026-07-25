@@ -22,6 +22,7 @@ export default function AdminProductsPage() {
   const [inventoryStockMap, setInventoryStockMap] = useState<Record<string, number>>({});
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Form State with Stock Field
   const [formData, setFormData] = useState({
@@ -140,11 +141,34 @@ export default function AdminProductsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('¿Deseas eliminar este producto del catálogo?')) {
-      const response = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const confirmed = confirm(
+      '¿Deseas retirar este producto del catálogo? Ya no se venderá, pero sus pedidos anteriores se conservarán.'
+    );
+    if (!confirmed) return;
+
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
       const payload = await response.json();
-      if (!response.ok) alert(payload.error || 'No se pudo eliminar');
+      if (!response.ok) throw new Error(payload.error || 'No se pudo retirar el producto');
+
+      setNotice({
+        type: 'success',
+        message:
+          payload.message ||
+          'Producto retirado del catálogo. El historial de compras se conservó.',
+      });
       await loadProductsAndStock();
+    } catch (error) {
+      setNotice({
+        type: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo retirar el producto del catálogo.',
+      });
     }
   };
 
@@ -193,6 +217,19 @@ export default function AdminProductsPage() {
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div
+          role="status"
+          className={`rounded-2xl border px-4 py-3 text-xs font-medium ${
+            notice.type === 'success'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+              : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
 
       {/* Products Data Table */}
       <div className="glass-vip-card rounded-3xl overflow-hidden border-[#1C1C1C] shadow-2xl">
@@ -272,7 +309,7 @@ export default function AdminProductsPage() {
                           <button
                             onClick={() => handleDelete(p.id)}
                             className="p-2 rounded-xl bg-[#141414] border border-[#1C1C1C] text-zinc-300 hover:text-rose-400"
-                            title="Eliminar"
+                            title="Retirar del catálogo"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

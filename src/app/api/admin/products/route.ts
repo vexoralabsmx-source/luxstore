@@ -38,6 +38,7 @@ export async function GET() {
   const { data, error } = await context.admin
     .from('products')
     .select('*, category:categories(name), images:product_images(id, image_url, sort_order)')
+    .neq('status', 'archived')
     .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -116,8 +117,27 @@ export async function DELETE(request: Request) {
   if (!context) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   const id = new URL(request.url).searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 });
-  const { error } = await context.admin.from('products').delete().eq('id', id);
-  return error
-    ? NextResponse.json({ error: error.message }, { status: 409 })
-    : NextResponse.json({ success: true });
+
+  const { data, error } = await context.admin
+    .from('products')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json(
+      { error: 'No se pudo retirar el producto del catálogo' },
+      { status: 409 }
+    );
+  }
+  if (!data) {
+    return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    archived: true,
+    message: 'Producto retirado del catálogo. El historial de compras se conservó.',
+  });
 }
