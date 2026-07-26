@@ -86,7 +86,13 @@ export default function AdminOrdersPage() {
             </thead>
             <tbody className="divide-y divide-[#1C1C1C]">
               {orders.length > 0 ? (
-                orders.map((order, index) => (
+                orders.map((order, index) => {
+                  const canApproveSpei =
+                    order.payment_method === 'spei'
+                    && ['PENDING_PAYMENT', 'PAYMENT_REVIEW'].includes(order.status);
+                  const canRetryDelivery = ['PAID', 'PROCESSING'].includes(order.status);
+
+                  return (
                   <tr key={`${order.order_number || order.id || index}`} className="hover:bg-[#0E0E0E] transition-colors">
                     <td className="px-6 py-4 font-mono">
                       <span className="font-bold text-white block">{order.order_number}</span>
@@ -133,20 +139,27 @@ export default function AdminOrdersPage() {
                           <Eye className="w-4 h-4 text-[#C5A880]" />
                         </Link>
 
-                        {order.status !== 'DELIVERED' && (
+                        {(canApproveSpei || canRetryDelivery) && (
                           <button
                             disabled={deliveringId === order.order_number}
                             onClick={() => handleApproveAndDeliver(order.order_number)}
                             className="px-3.5 py-1.5 rounded-xl bg-[#C5A880] text-black font-bold text-xs hover:bg-[#E8D8C8] transition-all flex items-center gap-1 cursor-pointer"
                           >
                             <Zap className="w-3.5 h-3.5" />
-                            <span>{deliveringId === order.order_number ? 'Entregando...' : 'Aprobar & Entregar'}</span>
+                            <span>
+                              {deliveringId === order.order_number
+                                ? 'Procesando...'
+                                : canApproveSpei
+                                  ? 'Aprobar SPEI & Entregar'
+                                  : 'Reintentar entrega'}
+                            </span>
                           </button>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-xs text-zinc-500 font-mono">
