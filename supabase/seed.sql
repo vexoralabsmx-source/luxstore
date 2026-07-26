@@ -1,7 +1,8 @@
--- Crea las cuentas administrativas mediante Supabase Auth.
--- Nunca guardes correos privados ni contraseñas en este archivo.
+-- DATOS INICIALES PÚBLICOS
+-- Este seed NO crea, modifica ni elimina usuarios de Supabase Auth.
+-- Las cuentas y contraseñas se gestionan únicamente desde Supabase Auth.
 
--- 2. Configuración Global de la Tienda
+-- 1. Configuración global de la tienda
 INSERT INTO public.store_settings (id, store_name, currency, support_email)
 VALUES (
   1,
@@ -13,7 +14,7 @@ VALUES (
   currency = EXCLUDED.currency,
   support_email = EXCLUDED.support_email;
 
--- 3. Categorías Base
+-- 2. Categorías base
 INSERT INTO public.categories (name, slug, description, is_active)
 VALUES
   ('Diseño y Productividad', 'diseno-productividad', 'Canva Pro, CapCut Pro, Scribd, Microsoft 365', true),
